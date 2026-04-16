@@ -1,104 +1,73 @@
-# Funplay MCP for Godot
+<p align="center">
+  <h1 align="center">Funplay MCP for Godot</h1>
+  <p align="center">
+    <strong>The Most Advanced MCP Server for Godot Editor</strong>
+  </p>
+  <p align="center">
+    <a href="#"><img src="https://img.shields.io/badge/Godot-4.2%2B-blue?logo=godotengine" alt="Godot 4.2+"></a>
+    <a href="#"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+    <a href="#"><img src="https://img.shields.io/badge/MCP-Compatible-green" alt="MCP Compatible"></a>
+    <a href="#"><img src="https://img.shields.io/badge/Platform-Editor%20Only-orange" alt="Editor Only"></a>
+  </p>
+  <p align="center">
+    中文 | <a href="./README.md">English</a>
+  </p>
+  <p align="center">
+    <img src="./icon.svg" alt="Funplay MCP for Godot" width="128">
+  </p>
+</p>
 
-这是一个运行在 Godot 编辑器内的 MCP 插件，整体设计直接借鉴了 `funplay-unity-mcp`：
+> 💖 如果这个项目对你有帮助，欢迎顺手点一个 Star。它能帮助更多 Godot 开发者发现这个项目，也能支持后续持续维护。
 
-- MCP Server 内嵌在编辑器里
-- 以高杠杆的 `execute_code` 为核心工具
-- 通过 resources 暴露项目上下文
-- 通过 `core` / `full` 两档工具面控制噪音
+---
 
-## 当前版本能力
+Funplay MCP for Godot 是一个采用 MIT 协议的 Godot 编辑器 MCP 服务器，让 Claude Code、Cursor、Windsurf、Codex、VS Code Copilot 等 AI 助手直接操作正在运行的 Godot 项目。
 
-这一版现在已经包含：
+一句话描述你的游戏或工具 —— AI 助手就能通过 Funplay MCP for Godot 的内置工具完成场景创建、脚本生成、UI 搭建、运行态验证、输入模拟、动画设置、相机控制、性能检查和编辑器自动化。
 
-- 运行在 `127.0.0.1` 的内嵌 HTTP MCP Server
-- Godot 编辑器右侧 Dock 面板
-- `core` 与 `full` 两种工具配置
-- 内置工具能力覆盖：
-  - 脚本 / 代码执行
-  - 场景打开 / 保存 / 新建 / 实例化
-  - PackedScene 导出与检查
-  - 节点查询 / 选择 / 查找 / 创建 / 复制 / 重挂载 / 删除
-  - 节点属性 / 信号 / 方法反射
-  - 节点属性与 Transform 修改
-  - 文件读取 / 写入 / 搜索 / 复制 / 移动 / 删除
-  - Script 创建 / 编辑 / 打开 / Patch
-  - Script reload / error 诊断
-  - Play 模式控制
-  - Action / 键盘 / 鼠标输入模拟
-  - 鼠标拖拽与输入序列模拟
-  - 时间缩放控制
-  - 最近日志读取
-  - 性能快照
-  - 场景复杂度分析
-  - 编辑器视图截图
-  - Material 创建与绑定
-  - 更深入的 Godot UI / Control 构建
-  - AnimationPlayer 动画片段 / 轨道工具
-  - Camera2D / Camera3D 专用工具
-  - addon/plugin 清单与启停
-- MCP Resources：
-  - `godot://project/context`
-  - `godot://scene/current`
-  - `godot://selection/current`
-  - `godot://interaction/history`
-  - `godot://logs/recent`
-  - `godot://scripts/errors`
-  - `godot://project/features`
-  - `godot://play/state`
-  - `godot://performance/snapshot`
-  - `godot://scenes/list`
-  - `godot://file/{path}`
-- MCP Prompts：
-  - `scene_review`
-  - `feature_plan`
-  - `runtime_debug`
-  - `script_patch`
-  - `ui_layout_plan`
+> *"做一个带血条、弹药显示、暂停菜单和受击闪屏的俯视角射击游戏 HUD"*
+>
+> AI 助手通过 Funplay MCP for Godot 全程处理：创建场景结构、生成脚本、搭建 Control 树、连接信号、配置动画并验证流程 —— 只需一句话。
 
 ## 快速开始
 
-### 1. 用 Godot 4.2+ 打开仓库
+如果你只想尽快跑起来，先做这三步：
 
-仓库里已经带了最小可用的 `project.godot`，可以直接当成 Godot 项目打开。
+- 打开本项目，或者把 `addons/funplay_mcp` 拷贝到你自己的 Godot 项目里
+- 启用插件并启动 MCP Server
+- 使用内置的一键客户端配置
 
-### 2. 启用插件
+### 1. 安装插件
 
-进入 `Project > Project Settings > Plugins`，启用 `Funplay MCP for Godot`。
+你可以：
 
-启用后，右侧会出现 `Funplay MCP` 面板。
+- 直接 clone 本仓库并作为 Godot 项目打开，或者
+- 把 `addons/funplay_mcp` 拷贝到你自己的 Godot `res://addons/` 目录
 
-### 3. 启动 MCP Server
+> 💡 在 clone 或安装之前，如果你愿意顺手点一个 ⭐，会非常感谢。
 
-在 `Funplay MCP` 面板中：
+### 2. 启用并启动 MCP Server
 
-- 勾选 `Enable MCP Server`
-- 使用默认 `8765` 端口，或者改成你想要的端口
-- 选择 `core` 或 `full`
+在 Godot 中：
 
-插件会监听 `http://127.0.0.1:<port>/`。
+- 打开 **Project → Project Settings → Plugins**
+- 启用 **Funplay MCP for Godot**
+- 使用右侧的 **Funplay MCP** Dock
 
-如果端口被占用，会自动尝试附近端口，并把最终端口保存到 `user://funplay_mcp_settings.cfg`。
+默认从 `http://127.0.0.1:8765/` 启动。
+如果该端口已被占用，插件会自动选择另一个可用本地端口，并写回 `user://funplay_mcp_settings.cfg`。
 
-### 4. 配置 AI 客户端
+### 3. 配置 AI 客户端
 
-你可以直接用面板里的 snippet 拷贝功能，也可以点 `Configure` 直接写入配置文件。
+优先使用 `Funplay MCP` Dock 里的 **一键 MCP 配置**。
 
-当前已经支持一键写入：
+选择目标客户端后点击 **Configure**，插件会直接帮你写入推荐的 MCP 配置项。
 
-- Codex
-- Claude Code
-- Cursor
-- VS Code
+如果 Godot 自动切到了其他端口，请以 Dock 里显示的 endpoint 为准。
+如果你更想手动编辑配置文件，再参考下面这些示例：
 
-**Codex**
-
-```toml
-[mcp_servers.funplay]
-url = "http://127.0.0.1:8765/"
-```
-
-**Claude Code**
+<details>
+<summary>Claude Code / Claude Desktop</summary>
 
 ```json
 {
@@ -111,7 +80,10 @@ url = "http://127.0.0.1:8765/"
 }
 ```
 
-**Cursor**
+</details>
+
+<details>
+<summary>Cursor</summary>
 
 ```json
 {
@@ -123,76 +95,131 @@ url = "http://127.0.0.1:8765/"
 }
 ```
 
-### 5. 验证连接
+</details>
 
-建议先试这些：
+<details>
+<summary>VS Code</summary>
 
-- `get_project_info`
-- `get_scene_tree`
-- 读取 `godot://project/context`
-- 调用 `execute_code`：
-
-```gdscript
-return {
-	"scene_root": ctx["scene_root"].name if ctx["scene_root"] != null else "",
-	"selection_count": ctx["selection"].size()
+```json
+{
+  "servers": {
+    "funplay": {
+      "type": "http",
+      "url": "http://127.0.0.1:8765/"
+    }
+  }
 }
 ```
 
-## 工具档位
+</details>
 
-### `core`
+<details>
+<summary>Codex</summary>
 
-默认推荐，但已经足够覆盖高频工作流：
+```toml
+[mcp_servers.funplay]
+url = "http://127.0.0.1:8765/"
+```
 
-- `execute_code`
-- 场景查看 / 打开 / 保存
-- 文件读写 / 搜索
-- Script 创建 / 编辑 / 打开 / Patch
-- Play 状态 / 输入模拟 / 拖拽与序列输入 / 时间缩放控制
-- 最近日志读取
-- 性能 / 复杂度分析
-- 编辑器截图
-- 节点选择与查找
+</details>
 
-### `full`
+### 4. 验证连接
 
-在 `core` 基础上额外暴露更直接的编辑能力：
+先在 AI 客户端里试几个安全请求：
 
-- 新建场景与实例化子场景
-- 将节点子树保存成 PackedScene，并检查 PackedScene 文件
-- 创建 / 复制 / 重命名 / 重挂载 / 删除节点
-- 查看节点属性 / 信号 / 方法，降低误改概率
-- 创建 CanvasLayer / Control / Label / Button / Panel / TextureRect / Container UI 树
-- 设置控件布局、尺寸策略、文本、贴图和 Theme Override
-- 连接 UI 节点信号和脚本方法
-- 设置节点属性与 Transform
-- 给节点绑定 Script
-- 创建 / 绑定 Material
-- 创建 AnimationPlayer、动画片段、动画轨道，并播放动画
-- 配置 Camera2D / Camera3D 属性
-- 列出和启停 addons/plugins
-- 删除 / 移动 / 复制文件
+- “调用 `get_scene_info`，告诉我当前打开的是哪个场景。”
+- “读取 `godot://project/context`，总结当前编辑器状态。”
+- “调用 `execute_code`，返回当前激活场景名。”
 
-## 说明
+如果这些都正常返回，说明 MCP server、resources 和主执行工具都已经连通。
 
-- 这是一个仅编辑器侧插件，不会进入游戏运行时。
-- 当前 HTTP 传输层是本地简化版 request/response 实现。
-- 代码结构和体验设计明显参考了 Unity 版本，目前已经覆盖大多数 Godot 日常编辑工作流，但还不是与 Unity 版一一完全对齐。
-- `execute_code` 权限很高，只建议暴露给你信任的本地 MCP 客户端。
+### 5. 开始构建
 
-## 目录结构
+打开你的 AI 客户端，试试：*"创建一个带血条、分数文本和暂停按钮的 2D HUD"*
 
-- `addons/funplay_mcp/plugin.gd` — 插件入口
-- `addons/funplay_mcp/core/funplay_mcp_server.gd` — 服务生命周期
-- `addons/funplay_mcp/core/funplay_mcp_request_handler.gd` — MCP 协议请求分发
-- `addons/funplay_mcp/core/funplay_tool_registry.gd` — 工具定义与 profile
-- `addons/funplay_mcp/core/funplay_core_tools.gd` — Godot 编辑器工具实现
-- `addons/funplay_mcp/ui/funplay_mcp_dock.gd` — 编辑器 UI
+## 开始前说明
 
-## 后续可以继续补的点
+- 这是一个 **仅限 Editor** 的插件，不会向最终导出游戏添加运行时代码。
+- MCP Server 默认从 `http://127.0.0.1:8765/` 启动；如果端口被占用，会自动切换到其他可用本地端口。
+- 本地 MCP Server 配置保存在 `user://funplay_mcp_settings.cfg`。
+- 插件默认使用 `core` MCP 工具暴露配置，减少 AI 客户端的工具噪音；如果你需要完整工具面，可在 Dock 中切换到 `full`。
+- 所有已暴露的 MCP 工具都会直接执行，不再提供额外 approval 开关。
+- Dock 内置 Codex、Claude Code、Cursor、VS Code 的配置复制和直接写入能力。
 
-和 Unity 版本相比，目前最主要还可以继续补的是：
+## 为什么做这个项目
 
-- 比文件日志更深入的编辑器 Console / Error 集成
-- 更多 MCP 客户端的一键配置写入
+- **`execute_code` 主工具优先** — 核心体验围绕一个高灵活度 GDScript 执行工具构建，适合复杂编辑器/运行态编排
+- **Play Mode 自动化闭环** — 进入运行模式、模拟输入、查看日志、截图、验证行为都能在同一 MCP 会话里完成
+- **内建项目上下文** — 直接提供项目状态、当前场景、选择对象、运行状态、脚本错误、日志和 MCP 交互记录资源
+- **默认聚焦，必要时全量** — 默认 `core` 工具集更利于 AI 选工具，需要时可切到 `full`
+- **单 Godot Addon 落地** — 不需要额外 approval UI，也不依赖单独的 Python 守护进程
+- **可扩展** — 后续可以继续扩展更多 Godot 专用工具、资源和工作流 prompt
+
+## 核心特性
+
+- **87 个内置工具** — 覆盖场景编辑、PackedScene、脚本、文件、运行态控制、输入模拟、UI 控件、动画、相机、性能、Resources、Prompts 与编辑器自动化
+- **Resources 与 Prompts** — 暴露实时项目上下文、场景/选择/错误资源、资源模板，以及常见 Godot 工作流的可复用 MCP Prompt
+- **输入模拟 + 视图截图验证** — 在 Play Mode 中模拟 action / 键盘 / 鼠标 / 拖拽，再用编辑器视图截图验证结果
+- **一键客户端配置** — 直接在 Godot Dock 中为 Codex、Claude Code、Cursor、VS Code 生成并写入 MCP 配置
+- **UI/Control 工具链** — 可直接构建 CanvasLayer / Control 树、设置布局、覆盖 Theme、连接信号并搭建 HUD
+- **厂商无关** — 兼容任意支持 MCP 的 AI 客户端：Claude Code、Cursor、Windsurf、Codex、VS Code Copilot 等
+
+## 与 Unity MCP 的对比
+
+下表基于 `FunplayAI/funplay-unity-mcp` 的公开定位与结构做对比。
+
+| 维度 | Funplay MCP for Godot | Funplay MCP for Unity |
+|------|------------------------|-----------------------|
+| 引擎侧架构 | Godot Addon 内置 HTTP MCP server | Unity 包内置 HTTP MCP server |
+| 额外本地依赖 | `core` 工作流下只需要 Godot Addon 本身 | `core` 工作流下只需要 Unity 包本身 |
+| 主要交互模型 | 以 `execute_code` 为主，再配合少量高频辅助工具 | 以 `execute_code` 为主，再配合少量高频辅助工具 |
+| 默认工具暴露 | 默认 `core` 精简工具集，可切 `full` | 默认 `core` 精简工具集，可切 `full` |
+| 上下文能力 | 项目资源、脚本错误、运行状态、日志、Prompts、交互历史 | 项目资源、编译错误、运行状态、日志、Prompts、交互历史 |
+| UI 自动化 | 深度支持 Godot `Control` / `CanvasLayer` 工作流 | 深度支持 Unity Canvas / UI 工作流 |
+| 定位 | 轻量、直接、MIT 协议的 Godot MCP 服务器 | 轻量、直接、MIT 协议的 Unity MCP 服务器 |
+
+## MCP 能力结构
+
+当前开源包有四层高价值能力：
+
+- **Tools** — 共 87 个工具，覆盖场景、脚本、文件、UI、动画、相机、诊断与自动化
+- **Primary execution** — `execute_code` 用于复杂编辑器/运行态编排
+- **Prompts** — 包括 `scene_review`、`feature_plan`、`runtime_debug`、`script_patch`、`ui_layout_plan` 等工作流 Prompt
+- **Resources** — 项目上下文、场景摘要、选择状态、日志、脚本错误、运行状态、项目特性、MCP 交互记录，以及文件模板资源
+
+## 内置工具
+
+Funplay MCP for Godot 当前提供 **87 个工具函数**，覆盖这些工作流分组：
+
+| 分类 | 工具 |
+|------|------|
+| **场景** | `get_scene_info`, `get_scene_tree`, `list_scenes`, `open_scene`, `save_scene`, `save_scene_as`, `create_new_scene`, `instantiate_scene`, `create_packed_scene_from_node`, `get_packed_scene_info` |
+| **节点** | `get_node_info`, `find_nodes`, `select_node`, `create_node`, `duplicate_node`, `rename_node`, `reparent_node`, `remove_node`, `set_node_property`, `set_node_properties`, `set_transform_2d`, `set_transform_3d`, `set_node_script` |
+| **节点反射** | `list_node_properties`, `list_node_signals`, `list_node_methods` |
+| **脚本** | `create_script`, `edit_script`, `patch_script`, `open_script`, `validate_gdscript_file`, `get_script_errors`, `request_script_reload` |
+| **文件** | `read_file`, `write_file`, `search_files`, `list_files`, `file_exists`, `delete_file`, `move_file`, `copy_file` |
+| **运行 / 输入** | `get_play_state`, `enter_play_mode`, `play_main_scene`, `exit_play_mode`, `simulate_action`, `simulate_key_event`, `simulate_mouse_button`, `simulate_mouse_drag`, `simulate_input_sequence`, `get_time_scale`, `set_time_scale` |
+| **性能 / 日志** | `get_performance_snapshot`, `analyze_scene_complexity`, `get_console_logs`, `log_message` |
+| **动画** | `create_animation_player`, `create_animation_clip`, `add_animation_track`, `list_animations`, `play_animation` |
+| **相机** | `get_camera_info`, `set_camera_2d`, `set_camera_3d` |
+| **材质** | `create_material`, `assign_material` |
+| **UI / Control** | `create_ui_root`, `create_control`, `create_label`, `create_button`, `create_panel`, `create_texture_rect`, `create_container`, `set_control_layout`, `set_control_size_flags`, `set_control_text`, `set_control_theme_override`, `set_control_texture`, `connect_node_signal` |
+| **项目 / Addons** | `get_project_info`, `list_project_features`, `select_file`, `list_addons`, `set_addon_enabled` |
+| **截图 / 执行** | `capture_editor_view`, `execute_code` |
+
+## 仓库结构
+
+- `addons/funplay_mcp/plugin.gd` — Godot 编辑器插件入口
+- `addons/funplay_mcp/core/` — MCP server、tools、resources、prompts、settings、config writer
+- `addons/funplay_mcp/ui/` — Godot Dock UI
+- `CHANGELOG.md` — 面向用户的变更记录
+- `CONTRIBUTING.md` — 贡献说明
+- `RELEASE_CHECKLIST.md` — 发布清单
+
+## 参与贡献
+
+见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+
+## License
+
+本仓库采用 [MIT](./LICENSE) 协议。

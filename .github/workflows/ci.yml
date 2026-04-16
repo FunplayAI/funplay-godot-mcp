@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Validate repository
+        run: |
+          python - <<'PY'
+          import configparser
+          import pathlib
+          import sys
+
+          root = pathlib.Path(".")
+          errors = []
+
+          required_files = [
+              root / "README.md",
+              root / "README_CN.md",
+              root / "LICENSE",
+              root / "addons" / "funplay_mcp" / "plugin.cfg",
+              root / "addons" / "funplay_mcp" / "plugin.gd",
+          ]
+
+          for path in required_files:
+              if not path.exists():
+                  errors.append(f"Missing required file: {path}")
+
+          plugin_cfg = root / "addons" / "funplay_mcp" / "plugin.cfg"
+          if plugin_cfg.exists():
+              parser = configparser.ConfigParser()
+              try:
+                  parser.read(plugin_cfg, encoding="utf-8")
+              except Exception as exc:
+                  errors.append(f"plugin.cfg is not valid INI: {exc}")
+              else:
+                  if "plugin" not in parser:
+                      errors.append("plugin.cfg is missing [plugin] section")
+                  else:
+                      for key in ("name", "description", "author", "version", "script"):
+                          if not parser["plugin"].get(key):
+                              errors.append(f"plugin.cfg is missing required key: {key}")
+
+          forbidden_paths = []
+          for path in root.rglob("*"):
+              if ".git" in path.parts:
+                  continue
+              if path.name == ".DS_Store" or ".idea" in path.parts:
+                  forbidden_paths.append(str(path))
+
+          if forbidden_paths:
+              errors.append("Repository contains local junk files:\n- " + "\n- ".join(sorted(forbidden_paths)))
+
+          if errors:
+              print("Validation failed:\n")
+              for error in errors:
+                  print(f"- {error}")
+              sys.exit(1)
+
+          print("Repository validation passed.")
+          PY
