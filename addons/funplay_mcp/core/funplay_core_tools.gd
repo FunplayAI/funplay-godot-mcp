@@ -108,6 +108,7 @@ func get_project_info(_arguments: Dictionary) -> String:
 		"open_scene_count": editor.get_open_scenes().size(),
 		"is_playing_scene": editor.is_playing_scene(),
 		"time_scale": Engine.time_scale,
+		"script_language_mode": detect_script_language_mode(),
 		"tool_profile": _settings.tool_profile if _settings != null else "core",
 		"server_enabled": _settings.server_enabled if _settings != null else true,
 		"server_port": _settings.server_port if _settings != null else 8765,
@@ -398,9 +399,16 @@ func copy_file(arguments: Dictionary) -> String:
 
 
 func create_script(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var requested_path := str(arguments.get("path", ""))
+	var requested_language := str(arguments.get("language", "auto")).to_lower()
+	var resolved_language := _resolve_requested_script_language(requested_language, requested_path)
+	var path := _normalize_script_path(requested_path, resolved_language)
 	if path == "":
 		return "Error: 'path' is required."
+	if resolved_language == "dotnet":
+		var csharp_arguments = arguments.duplicate(true)
+		csharp_arguments["path"] = path
+		return create_csharp_script(csharp_arguments)
 
 	var extends_name := str(arguments.get("extends", "Node")).strip_edges()
 	var class_name := str(arguments.get("class_name", "")).strip_edges()
@@ -433,6 +441,124 @@ func create_script(arguments: Dictionary) -> String:
 		})
 
 	return result
+
+
+func list_scripts(arguments: Dictionary) -> String:
+	var root_path := _normalize_path(str(arguments.get("path", "res://")))
+	var max_entries := clamp(int(arguments.get("max_entries", 300)), 1, 5000)
+	var recursive := bool(arguments.get("recursive", true))
+	var requested_language := str(arguments.get("language", "auto")).to_lower()
+	var resolved_language := _resolve_requested_script_language_set(requested_language)
+	var scripts: Array = []
+
+	if resolved_language == "gdscript" or resolved_language == "mixed":
+		var gd_paths: Array = []
+		_collect_matching_files(root_path, recursive, max_entries, gd_paths, [".gd"])
+		gd_paths = _exclude_internal_plugin_paths(gd_paths)
+		for path in gd_paths:
+			scripts.append({"path": path, "language": "gdscript"})
+
+	if resolved_language == "dotnet" or resolved_language == "mixed":
+		var cs_paths: Array = []
+		_collect_matching_files(root_path, recursive, max_entries, cs_paths, [".cs"])
+		cs_paths = _exclude_internal_plugin_paths(cs_paths)
+		for path in cs_paths:
+			scripts.append({"path": path, "language": "dotnet"})
+
+	return _render_variant({
+		"path": root_path,
+		"language": resolved_language,
+		"count": scripts.size(),
+		"scripts": scripts,
+	})
+
+
+func create_csharp_script(arguments: Dictionary) -> String:
+	var path := _normalize_path(str(arguments.get("path", "")))
+	if path == "":
+		return "Error: 'path' is required."
+	if not path.to_lower().ends_with(".cs"):
+		return "Error: C# script path must end with .cs"
+
+	var class_name := str(arguments.get("class_name", "")).strip_edges()
+	if class_name == "":
+		class_name = _pascal_case(path.get_file().trim_suffix(".cs"))
+
+	var namespace_name := str(arguments.get("namespace", "")).strip_edges()
+	var base_class := str(arguments.get("extends", "Node")).strip_edges()
+	var body := str(arguments.get("body", "")).strip_edges()
+	var use_tool := bool(arguments.get("tool", false))
+	var use_partial := bool(arguments.get("partial", true))
+
+	var lines: Array[String] = []
+	lines.append("using Godot;")
+	if body.contains("System.") or body.contains("Console") or bool(arguments.get("include_system", false)):
+		lines.append("using System;")
+	lines.append("")
+	if namespace_name != "":
+		lines.append("namespace %s;" % namespace_name)
+		lines.append("")
+	if use_tool:
+		lines.append("[Tool]")
+	var partial_text := " partial" if use_partial else ""
+	lines.append("public%s class %s : %s" % [partial_text, class_name, base_class])
+	lines.append("{")
+	if body != "":
+		for line in body.split("\n"):
+			lines.append("\t%s" % line if line != "" else "")
+	else:
+		lines.append("\tpublic override void _Ready()")
+		lines.append("\t{")
+		lines.append("\t}")
+	lines.append("}")
+
+	var result := write_file({
+		"path": path,
+		"content": "\n".join(lines) + "\n",
+	})
+
+	if bool(arguments.get("open_in_editor", true)):
+		open_script({
+			"path": path,
+			"line": int(arguments.get("line", 1)),
+			"column": 0,
+		})
+
+	return result
+
+
+func list_csharp_scripts(arguments: Dictionary) -> String:
+	var root_path := _normalize_path(str(arguments.get("path", "res://")))
+	var max_entries := clamp(int(arguments.get("max_entries", 300)), 1, 5000)
+	var recursive := bool(arguments.get("recursive", true))
+	var script_paths: Array = []
+	_collect_matching_files(root_path, recursive, max_entries, script_paths, [".cs"])
+	script_paths = _exclude_internal_plugin_paths(script_paths)
+	return _render_variant({
+		"path": root_path,
+		"count": script_paths.size(),
+		"scripts": script_paths,
+	})
+
+
+func get_dotnet_project_info(_arguments: Dictionary) -> String:
+	var project_root := ProjectSettings.globalize_path("res://")
+	var csproj_files: Array = []
+	var sln_files: Array = []
+	_collect_matching_files(project_root, false, 200, csproj_files, [".csproj"])
+	_collect_matching_files(project_root, false, 200, sln_files, [".sln"])
+	var csharp_scripts: Array = []
+	_collect_matching_files("res://", true, 5000, csharp_scripts, [".cs"])
+	csharp_scripts = _exclude_internal_plugin_paths(csharp_scripts)
+
+	return _render_variant({
+		"is_dotnet_editor": OS.has_feature("dotnet"),
+		"project_root": project_root,
+		"csproj_files": csproj_files,
+		"sln_files": sln_files,
+		"csharp_script_count": csharp_scripts.size(),
+		"csharp_scripts_preview": csharp_scripts.slice(0, min(csharp_scripts.size(), 50)),
+	})
 
 
 func edit_script(arguments: Dictionary) -> String:
@@ -1876,9 +2002,271 @@ func list_project_features(_arguments: Dictionary) -> String:
 		"project_name": str(ProjectSettings.get_setting("application/config/name", "")),
 		"main_scene": str(ProjectSettings.get_setting("application/run/main_scene", "")),
 		"rendering_method": str(ProjectSettings.get_setting("rendering/renderer/rendering_method", "")),
+		"is_dotnet_editor": OS.has_feature("dotnet"),
+		"script_language_mode": detect_script_language_mode(),
+		"dotnet_project": JSON.parse_string(get_dotnet_project_info({})),
 		"input_actions": InputMap.get_actions(),
 		"autoloads": _list_autoloads(),
 	})
+
+
+func list_project_settings(arguments: Dictionary) -> String:
+	var prefix := str(arguments.get("prefix", "")).strip_edges()
+	var include_internal := bool(arguments.get("include_internal", false))
+	var max_results := clamp(int(arguments.get("max_results", 500)), 1, 5000)
+	var settings: Array = []
+	for property_info in ProjectSettings.get_property_list():
+		var name := str(property_info.get("name", ""))
+		if prefix != "" and not name.begins_with(prefix):
+			continue
+		if not include_internal and name.begins_with("_"):
+			continue
+		settings.append({
+			"name": name,
+			"value": _json_safe(ProjectSettings.get_setting(name, null)),
+			"type": int(property_info.get("type", TYPE_NIL)),
+			"hint": int(property_info.get("hint", 0)),
+			"hint_string": str(property_info.get("hint_string", "")),
+		})
+		if settings.size() >= max_results:
+			break
+	return _render_variant({
+		"prefix": prefix,
+		"count": settings.size(),
+		"settings": settings,
+	})
+
+
+func get_project_setting(arguments: Dictionary) -> String:
+	var key := str(arguments.get("key", "")).strip_edges()
+	if key == "":
+		return "Error: 'key' is required."
+	if not ProjectSettings.has_setting(key):
+		return "Error: Project setting not found: %s" % key
+	return _render_variant({
+		"key": key,
+		"value": _json_safe(ProjectSettings.get_setting(key)),
+	})
+
+
+func set_project_setting(arguments: Dictionary) -> String:
+	var key := str(arguments.get("key", "")).strip_edges()
+	if key == "":
+		return "Error: 'key' is required."
+	if not arguments.has("value"):
+		return "Error: 'value' is required."
+	ProjectSettings.set_setting(key, arguments.get("value"))
+	if bool(arguments.get("save", true)):
+		ProjectSettings.save()
+	return _render_variant({
+		"key": key,
+		"value": _json_safe(ProjectSettings.get_setting(key)),
+		"saved": bool(arguments.get("save", true)),
+	})
+
+
+func list_input_actions(_arguments: Dictionary) -> String:
+	var actions: Array = []
+	for action_name in InputMap.get_actions():
+		actions.append(_build_input_action_info(action_name))
+	return _render_variant({
+		"count": actions.size(),
+		"actions": actions,
+	})
+
+
+func get_input_action(arguments: Dictionary) -> String:
+	var action_name := str(arguments.get("action", "")).strip_edges()
+	if action_name == "":
+		return "Error: 'action' is required."
+	if not InputMap.has_action(action_name):
+		return "Error: Input action not found: %s" % action_name
+	return _render_variant(_build_input_action_info(action_name))
+
+
+func add_input_action(arguments: Dictionary) -> String:
+	var action_name := str(arguments.get("action", "")).strip_edges()
+	if action_name == "":
+		return "Error: 'action' is required."
+	if not InputMap.has_action(action_name):
+		InputMap.add_action(action_name, float(arguments.get("deadzone", 0.2)))
+	if arguments.has("events"):
+		var events = arguments.get("events")
+		if events is Array:
+			for event_data in events:
+				if event_data is Dictionary:
+					var event = _input_event_from_dict(event_data)
+					if event != null:
+						InputMap.action_add_event(action_name, event)
+	if bool(arguments.get("save", true)):
+		ProjectSettings.save()
+	return _render_variant(_build_input_action_info(action_name))
+
+
+func remove_input_action(arguments: Dictionary) -> String:
+	var action_name := str(arguments.get("action", "")).strip_edges()
+	if action_name == "":
+		return "Error: 'action' is required."
+	if not InputMap.has_action(action_name):
+		return "Error: Input action not found: %s" % action_name
+	InputMap.erase_action(action_name)
+	if bool(arguments.get("save", true)):
+		ProjectSettings.save()
+	return "Removed input action: %s" % action_name
+
+
+func add_input_event_to_action(arguments: Dictionary) -> String:
+	var action_name := str(arguments.get("action", "")).strip_edges()
+	if action_name == "":
+		return "Error: 'action' is required."
+	if not InputMap.has_action(action_name):
+		return "Error: Input action not found: %s" % action_name
+	var event = _input_event_from_dict(arguments.get("event", {}))
+	if event == null:
+		return "Error: Could not build InputEvent from 'event'."
+	InputMap.action_add_event(action_name, event)
+	if bool(arguments.get("save", true)):
+		ProjectSettings.save()
+	return _render_variant(_build_input_action_info(action_name))
+
+
+func clear_input_events(arguments: Dictionary) -> String:
+	var action_name := str(arguments.get("action", "")).strip_edges()
+	if action_name == "":
+		return "Error: 'action' is required."
+	if not InputMap.has_action(action_name):
+		return "Error: Input action not found: %s" % action_name
+	InputMap.action_erase_events(action_name)
+	if bool(arguments.get("save", true)):
+		ProjectSettings.save()
+	return _render_variant(_build_input_action_info(action_name))
+
+
+func list_autoloads(_arguments: Dictionary) -> String:
+	var autoloads := _list_autoloads()
+	return _render_variant({
+		"count": autoloads.size(),
+		"autoloads": autoloads,
+	})
+
+
+func set_autoload(arguments: Dictionary) -> String:
+	var name := str(arguments.get("name", "")).strip_edges()
+	var path := _normalize_path(str(arguments.get("path", "")))
+	if name == "" or path == "":
+		return "Error: 'name' and 'path' are required."
+	var key := "autoload/%s" % name
+	var value := str(arguments.get("value", path))
+	ProjectSettings.set_setting(key, value)
+	if bool(arguments.get("save", true)):
+		ProjectSettings.save()
+	return _render_variant({
+		"name": name,
+		"path": value,
+	})
+
+
+func remove_autoload(arguments: Dictionary) -> String:
+	var name := str(arguments.get("name", "")).strip_edges()
+	if name == "":
+		return "Error: 'name' is required."
+	var key := "autoload/%s" % name
+	if not ProjectSettings.has_setting(key):
+		return "Error: Autoload not found: %s" % name
+	ProjectSettings.set_setting(key, null)
+	if bool(arguments.get("save", true)):
+		ProjectSettings.save()
+	return "Removed autoload: %s" % name
+
+
+func assert_node_exists(arguments: Dictionary) -> String:
+	var node_path := str(arguments.get("node_path", "")).strip_edges()
+	if node_path == "":
+		return "Error: 'node_path' is required."
+	var node = _resolve_node_path(node_path)
+	var exists := node != null
+	var should_exist := bool(arguments.get("should_exist", true))
+	if exists != should_exist:
+		return "Error: Node existence assertion failed for '%s' (exists=%s, expected=%s)." % [node_path, str(exists), str(should_exist)]
+	return _render_variant({
+		"node_path": node_path,
+		"exists": exists,
+		"expected": should_exist,
+	})
+
+
+func assert_node_property(arguments: Dictionary) -> String:
+	var node_path := str(arguments.get("node_path", "")).strip_edges()
+	var property_name := str(arguments.get("property", "")).strip_edges()
+	if node_path == "" or property_name == "":
+		return "Error: 'node_path' and 'property' are required."
+	var node = _resolve_node_path(node_path)
+	if node == null:
+		return "Error: Node not found: %s" % node_path
+	var actual = node.get(property_name)
+	var expected = arguments.get("expected")
+	var equals := _values_equal(actual, expected)
+	if not equals:
+		return "Error: Property assertion failed for '%s.%s'. actual=%s expected=%s" % [node_path, property_name, JSON.stringify(_json_safe(actual)), JSON.stringify(_json_safe(expected))]
+	return _render_variant({
+		"node_path": node_path,
+		"property": property_name,
+		"actual": _json_safe(actual),
+		"expected": _json_safe(expected),
+	})
+
+
+func assert_signal_connected(arguments: Dictionary) -> String:
+	var source_path := str(arguments.get("source_path", "")).strip_edges()
+	var target_path := str(arguments.get("target_path", "")).strip_edges()
+	var signal_name := str(arguments.get("signal_name", "")).strip_edges()
+	var method_name := str(arguments.get("method_name", "")).strip_edges()
+	if source_path == "" or target_path == "" or signal_name == "" or method_name == "":
+		return "Error: 'source_path', 'target_path', 'signal_name', and 'method_name' are required."
+	var source_node = _resolve_node_path(source_path)
+	var target_node = _resolve_node_path(target_path)
+	if source_node == null or target_node == null:
+		return "Error: Source or target node not found."
+	var connected := source_node.is_connected(signal_name, Callable(target_node, method_name))
+	if not connected:
+		return "Error: Signal assertion failed: %s.%s -> %s.%s is not connected." % [source_path, signal_name, target_path, method_name]
+	return _render_variant({
+		"source_path": source_path,
+		"signal_name": signal_name,
+		"target_path": target_path,
+		"method_name": method_name,
+		"connected": true,
+	})
+
+
+func wait_msec(arguments: Dictionary) -> String:
+	var duration := max(int(arguments.get("duration", 0)), 0)
+	OS.delay_msec(duration)
+	return _render_variant({
+		"duration": duration,
+	})
+
+
+func detect_script_language_mode() -> String:
+	var project_root := ProjectSettings.globalize_path("res://")
+	var csproj_files: Array = []
+	var sln_files: Array = []
+	var csharp_scripts: Array = []
+	var gd_scripts: Array = []
+	_collect_matching_files(project_root, false, 200, csproj_files, [".csproj"])
+	_collect_matching_files(project_root, false, 200, sln_files, [".sln"])
+	_collect_matching_files("res://", true, 5000, csharp_scripts, [".cs"])
+	_collect_matching_files("res://", true, 5000, gd_scripts, [".gd"])
+	csharp_scripts = _exclude_internal_plugin_paths(csharp_scripts)
+	gd_scripts = _exclude_internal_plugin_paths(gd_scripts)
+
+	var has_dotnet := csproj_files.size() > 0 or sln_files.size() > 0 or csharp_scripts.size() > 0
+	var has_gdscript := gd_scripts.size() > 0
+	if has_dotnet and has_gdscript:
+		return "mixed"
+	if has_dotnet:
+		return "dotnet"
+	return "gdscript"
 
 
 func validate_gdscript_file(arguments: Dictionary) -> String:
@@ -1899,22 +2287,130 @@ func validate_gdscript_file(arguments: Dictionary) -> String:
 	})
 
 
+func validate_script(arguments: Dictionary) -> String:
+	var path := _normalize_path(str(arguments.get("path", "")))
+	if path == "":
+		return "Error: 'path' is required."
+
+	var resolved_language := _resolve_requested_script_language(str(arguments.get("language", "auto")).to_lower(), path)
+	if resolved_language == "dotnet":
+		var validation = JSON.parse_string(validate_csharp_project(arguments))
+		if validation is Dictionary:
+			validation["path"] = path
+			validation["language"] = "dotnet"
+			return _render_variant(validation)
+		return "Error: Failed to validate C# project."
+
+	var gd_validation = JSON.parse_string(validate_gdscript_file({"path": path}))
+	if gd_validation is Dictionary:
+		gd_validation["language"] = "gdscript"
+		return _render_variant(gd_validation)
+	return "Error: Failed to validate GDScript file."
+
+
+func validate_csharp_project(arguments: Dictionary) -> String:
+	var project_root := ProjectSettings.globalize_path("res://")
+	var dotnet_info = JSON.parse_string(get_dotnet_project_info({}))
+	var result := {
+		"project_root": project_root,
+		"is_dotnet_editor": OS.has_feature("dotnet"),
+		"has_csproj": false,
+		"has_sln": false,
+		"dotnet_available": false,
+		"build_attempted": false,
+		"build_ok": false,
+		"exit_code": -1,
+		"output": [],
+	}
+
+	if dotnet_info is Dictionary:
+		var csproj_files = dotnet_info.get("csproj_files", [])
+		var sln_files = dotnet_info.get("sln_files", [])
+		result["has_csproj"] = csproj_files is Array and csproj_files.size() > 0
+		result["has_sln"] = sln_files is Array and sln_files.size() > 0
+
+	var probe_output: Array = []
+	var probe_exit := OS.execute("dotnet", ["--version"], probe_output, true)
+	result["dotnet_available"] = probe_exit == OK or probe_exit == 0
+
+	if bool(arguments.get("run_build", false)):
+		result["build_attempted"] = true
+		var build_output: Array = []
+		var build_args := ["build"]
+		var target_path := str(arguments.get("target", "")).strip_edges()
+		if target_path != "":
+			build_args.append(ProjectSettings.globalize_path(_normalize_path(target_path)))
+		if str(arguments.get("configuration", "")).strip_edges() != "":
+			build_args.append("-c")
+			build_args.append(str(arguments.get("configuration")))
+		var build_exit := OS.execute("dotnet", build_args, build_output, true)
+		result["exit_code"] = build_exit
+		result["build_ok"] = build_exit == 0
+		result["output"] = build_output
+	else:
+		result["output"] = probe_output
+
+	return _render_variant(result)
+
+
 func get_script_errors(arguments: Dictionary) -> String:
 	var root_path := _normalize_path(str(arguments.get("path", "res://")))
 	var max_files := clamp(int(arguments.get("max_files", 200)), 1, 3000)
-	var script_paths: Array = []
-	_collect_matching_files(root_path, true, max_files, script_paths, [".gd"])
+	var requested_language := str(arguments.get("language", "auto")).to_lower()
+	var resolved_language := _resolve_requested_script_language_set(requested_language)
 	var results: Array = []
-	for path in script_paths:
-		var validation_text := validate_gdscript_file({"path": path})
-		var validation = JSON.parse_string(validation_text)
-		if validation is Dictionary and not bool(validation.get("ok", false)):
-			results.append(validation)
+	var checked := 0
+
+	if resolved_language == "gdscript" or resolved_language == "mixed":
+		var gd_paths: Array = []
+		_collect_matching_files(root_path, true, max_files, gd_paths, [".gd"])
+		gd_paths = _exclude_internal_plugin_paths(gd_paths)
+		checked += gd_paths.size()
+		for path in gd_paths:
+			var validation_text := validate_gdscript_file({"path": path})
+			var validation = JSON.parse_string(validation_text)
+			if validation is Dictionary and not bool(validation.get("ok", false)):
+				validation["language"] = "gdscript"
+				results.append(validation)
+
+	if resolved_language == "dotnet" or resolved_language == "mixed":
+		var csharp_validation = JSON.parse_string(get_csharp_errors(arguments))
+		if csharp_validation is Dictionary:
+			csharp_validation["language"] = "dotnet"
+			results.append(csharp_validation)
+
 	return _render_variant({
 		"path": root_path,
-		"checked": script_paths.size(),
+		"language": resolved_language,
+		"checked": checked,
 		"error_count": results.size(),
 		"errors": results,
+	})
+
+
+func get_csharp_errors(arguments: Dictionary) -> String:
+	var validation = JSON.parse_string(validate_csharp_project({
+		"run_build": bool(arguments.get("run_build", true)),
+		"target": str(arguments.get("target", "")),
+		"configuration": str(arguments.get("configuration", "Debug")),
+	}))
+	if not (validation is Dictionary):
+		return "Error: Failed to validate C# project."
+
+	var output_lines = validation.get("output", [])
+	var error_lines: Array = []
+	if output_lines is Array:
+		for line in output_lines:
+			var text := str(line)
+			var normalized := text.to_lower()
+			if normalized.contains(": error") or normalized.contains(" error ") or normalized.begins_with("error"):
+				error_lines.append(text)
+
+	return _render_variant({
+		"build_ok": bool(validation.get("build_ok", false)),
+		"exit_code": int(validation.get("exit_code", -1)),
+		"error_count": error_lines.size(),
+		"errors": error_lines,
 	})
 
 
@@ -2177,6 +2673,54 @@ func _normalize_path(path: String) -> String:
 	return ("res://" + trimmed.trim_prefix("/")).simplify_path()
 
 
+func _normalize_script_path(path: String, language: String) -> String:
+	var normalized := _normalize_path(path)
+	if normalized == "":
+		return ""
+	if normalized.to_lower().ends_with(".gd") or normalized.to_lower().ends_with(".cs"):
+		return normalized
+	if language == "dotnet":
+		return normalized + ".cs"
+	return normalized + ".gd"
+
+
+func _resolve_requested_script_language(requested_language: String, path: String) -> String:
+	var normalized_request := requested_language.strip_edges().to_lower()
+	if normalized_request in ["gd", "gdscript"]:
+		return "gdscript"
+	if normalized_request in ["csharp", "cs", "dotnet"]:
+		return "dotnet"
+	if normalized_request == "mixed":
+		return "mixed"
+
+	var lower_path := path.to_lower()
+	if lower_path.ends_with(".gd"):
+		return "gdscript"
+	if lower_path.ends_with(".cs"):
+		return "dotnet"
+
+	var detected := detect_script_language_mode()
+	if detected == "mixed":
+		var dotnet_info = JSON.parse_string(get_dotnet_project_info({}))
+		if dotnet_info is Dictionary:
+			var csproj_files = dotnet_info.get("csproj_files", [])
+			if csproj_files is Array and csproj_files.size() > 0:
+				return "dotnet"
+		return "gdscript"
+	return detected
+
+
+func _resolve_requested_script_language_set(requested_language: String) -> String:
+	var normalized_request := requested_language.strip_edges().to_lower()
+	if normalized_request in ["gd", "gdscript"]:
+		return "gdscript"
+	if normalized_request in ["csharp", "cs", "dotnet"]:
+		return "dotnet"
+	if normalized_request == "mixed":
+		return "mixed"
+	return detect_script_language_mode()
+
+
 func _ensure_parent_dir(path: String) -> int:
 	var parent_dir := path.get_base_dir()
 	if parent_dir == "" or parent_dir == "res://" or parent_dir == "user://":
@@ -2392,6 +2936,85 @@ func _list_autoloads() -> Array:
 	return autoloads
 
 
+func _build_input_action_info(action_name: String) -> Dictionary:
+	var events: Array = []
+	for event in InputMap.action_get_events(action_name):
+		events.append(_serialize_input_event(event))
+	return {
+		"name": action_name,
+		"deadzone": InputMap.action_get_deadzone(action_name),
+		"event_count": events.size(),
+		"events": events,
+	}
+
+
+func _serialize_input_event(event: InputEvent) -> Dictionary:
+	var data := {
+		"type": event.get_class(),
+		"as_text": event.as_text(),
+	}
+	if event is InputEventKey:
+		data["keycode"] = event.keycode
+		data["physical_keycode"] = event.physical_keycode
+		data["unicode"] = event.unicode
+		data["pressed"] = event.pressed
+		data["echo"] = event.echo
+	if event is InputEventMouseButton:
+		data["button_index"] = event.button_index
+		data["pressed"] = event.pressed
+		data["position"] = _json_safe(event.position)
+	if event is InputEventAction:
+		data["action"] = event.action
+		data["pressed"] = event.pressed
+		data["strength"] = event.strength
+	return data
+
+
+func _input_event_from_dict(value) -> InputEvent:
+	if not (value is Dictionary):
+		return null
+	var event_type := str(value.get("type", "")).strip_edges().to_lower()
+	match event_type:
+		"key", "inputeventkey":
+			var key_event := InputEventKey.new()
+			key_event.pressed = bool(value.get("pressed", true))
+			key_event.echo = bool(value.get("echo", false))
+			key_event.keycode = _to_keycode(value.get("key", value.get("keycode")))
+			key_event.physical_keycode = _to_keycode(value.get("physical_key", value.get("physical_keycode")))
+			return key_event
+		"mouse_button", "inputeventmousebutton":
+			var mouse_event := InputEventMouseButton.new()
+			mouse_event.pressed = bool(value.get("pressed", true))
+			mouse_event.button_index = _to_mouse_button(value.get("button", value.get("button_index", "left")))
+			mouse_event.position = _to_vector2(value.get("position", Vector2.ZERO))
+			return mouse_event
+		"action", "inputeventaction":
+			var action_event := InputEventAction.new()
+			action_event.action = str(value.get("action", ""))
+			action_event.pressed = bool(value.get("pressed", true))
+			action_event.strength = float(value.get("strength", 1.0))
+			return action_event
+		_:
+			return null
+
+
+func _values_equal(left, right) -> bool:
+	return JSON.stringify(_json_safe(left)) == JSON.stringify(_json_safe(right))
+
+
+func _pascal_case(value: String) -> String:
+	var parts := value.replace("-", "_").replace(" ", "_").split("_")
+	var result := ""
+	for part in parts:
+		var text := str(part).strip_edges()
+		if text == "":
+			continue
+		result += text.substr(0, 1).to_upper() + text.substr(1)
+	if result == "":
+		return "NewScript"
+	return result
+
+
 func _refresh_filesystem() -> void:
 	var resource_filesystem = _editor().get_resource_filesystem()
 	if resource_filesystem != null:
@@ -2529,6 +3152,16 @@ func _matches_extension(path: String, extensions: Array) -> bool:
 		if lower.ends_with(str(extension).to_lower()):
 			return true
 	return false
+
+
+func _exclude_internal_plugin_paths(paths: Array) -> Array:
+	var filtered: Array = []
+	for path in paths:
+		var text := str(path).replace("\\", "/")
+		if text.contains("/addons/funplay_mcp/") or text.begins_with("res://addons/funplay_mcp/"):
+			continue
+		filtered.append(path)
+	return filtered
 
 
 func _to_vector2(value) -> Vector2:

@@ -23,6 +23,8 @@
 
 Funplay MCP for Godot is an MIT-licensed Godot Editor MCP server that lets AI assistants like Claude Code, Cursor, Windsurf, Codex, and VS Code Copilot operate directly inside your running Godot project.
 
+The addon works in standard Godot `4.2+` projects and is also usable in **Godot .NET** projects. The current implementation is GDScript-based, and the exported script tools are language-aware: GDScript projects see GDScript workflows, .NET projects see C#/.NET workflows, and mixed projects expose both where useful.
+
 Describe your game or tool in one sentence — your AI assistant builds it in Godot through Funplay MCP for Godot’s built-in tools for scene creation, script generation, UI authoring, play-mode validation, input simulation, animation setup, camera control, performance inspection, and editor automation.
 
 > *"Build a top-down shooter HUD with health, ammo, pause menu, and hit flash feedback"*
@@ -157,8 +159,8 @@ Open your AI client and try: *"Create a 2D HUD with health bar, score label, and
 
 ## Highlights
 
-- **87 Built-in Tools** — Scene editing, PackedScene workflows, scripts, files, play mode control, inputs, UI controls, animation, camera, performance, resources, prompts, and editor automation
-- **Resources & Prompts** — Live project context, scene/selection/error resources, resource templates, and reusable workflow prompts
+- **105 Built-in Tools** — Scene editing, PackedScene workflows, language-aware script tools, project settings, input map, autoloads, runtime assertions, files, play mode control, UI controls, animation, camera, performance, resources, prompts, and editor automation
+- **Resources & Prompts** — Live project context, scene/selection/error resources, language-aware script diagnostics, `.NET` project resources when applicable, resource templates, and reusable workflow prompts
 - **Input Simulation + View Capture** — Drive play mode with action/key/mouse simulation and verify results with captured editor views
 - **One-Click Client Configuration** — Generate MCP config entries for Codex, Claude Code, Cursor, and VS Code directly from the Godot dock
 - **UI/Control Tooling** — Build CanvasLayer and Control hierarchies, set layouts, apply theme overrides, wire signals, and create HUDs through MCP
@@ -182,24 +184,25 @@ The table below compares this repository with the public behavior and positionin
 
 The current open-source package exposes four high-value capability layers:
 
-- **Tools** — 87 total tools across scene editing, files, scripts, UI, animation, camera, diagnostics, and automation
+- **Tools** — 105 total registered tools across scene editing, scripts, project configuration, input map, autoloads, runtime assertions, files, UI, animation, camera, diagnostics, and automation. Script-related tools are filtered by detected project language.
 - **Primary execution** — `execute_code` for rich editor/runtime orchestration
 - **Prompts** — workflow prompts like `scene_review`, `feature_plan`, `runtime_debug`, `script_patch`, and `ui_layout_plan`
 - **Resources** — project context, scene summaries, selection state, logs, script errors, play state, project features, MCP interaction history, and file templates
 
 ## Built-in Tools
 
-Funplay MCP for Godot currently ships with **87 tool functions** across major workflow groups:
+Funplay MCP for Godot currently ships with **105 registered tool functions** across major workflow groups. The effective exported script tools are filtered by detected project language:
 
 | Category | Tools |
 |----------|-------|
 | **Scene** | `get_scene_info`, `get_scene_tree`, `list_scenes`, `open_scene`, `save_scene`, `save_scene_as`, `create_new_scene`, `instantiate_scene`, `create_packed_scene_from_node`, `get_packed_scene_info` |
 | **Nodes** | `get_node_info`, `find_nodes`, `select_node`, `create_node`, `duplicate_node`, `rename_node`, `reparent_node`, `remove_node`, `set_node_property`, `set_node_properties`, `set_transform_2d`, `set_transform_3d`, `set_node_script` |
 | **Node Reflection** | `list_node_properties`, `list_node_signals`, `list_node_methods` |
-| **Scripts** | `create_script`, `edit_script`, `patch_script`, `open_script`, `validate_gdscript_file`, `get_script_errors`, `request_script_reload` |
+| **Scripts** | `create_script`, `list_scripts`, `edit_script`, `patch_script`, `open_script`, `validate_script`, `get_script_errors`, `request_script_reload`; `.NET` projects also expose `get_dotnet_project_info` |
+| **Project Settings / Input / Autoload** | `list_project_settings`, `get_project_setting`, `set_project_setting`, `list_input_actions`, `get_input_action`, `add_input_action`, `remove_input_action`, `add_input_event_to_action`, `clear_input_events`, `list_autoloads`, `set_autoload`, `remove_autoload` |
 | **Files** | `read_file`, `write_file`, `search_files`, `list_files`, `file_exists`, `delete_file`, `move_file`, `copy_file` |
 | **Play / Input** | `get_play_state`, `enter_play_mode`, `play_main_scene`, `exit_play_mode`, `simulate_action`, `simulate_key_event`, `simulate_mouse_button`, `simulate_mouse_drag`, `simulate_input_sequence`, `get_time_scale`, `set_time_scale` |
-| **Performance / Logs** | `get_performance_snapshot`, `analyze_scene_complexity`, `get_console_logs`, `log_message` |
+| **Assertions / Diagnostics** | `assert_node_exists`, `assert_node_property`, `assert_signal_connected`, `wait_msec`, `get_performance_snapshot`, `analyze_scene_complexity`, `get_console_logs`, `log_message` |
 | **Animation** | `create_animation_player`, `create_animation_clip`, `add_animation_track`, `list_animations`, `play_animation` |
 | **Camera** | `get_camera_info`, `set_camera_2d`, `set_camera_3d` |
 | **Materials** | `create_material`, `assign_material` |

@@ -24,7 +24,7 @@ func list_tools(profile: String) -> Array:
 	var selected_profile := profile if profile in _profiles else "core"
 	var tools: Array = []
 	for tool_name in _profiles[selected_profile]:
-		if _tools.has(tool_name):
+		if is_tool_allowed(tool_name, selected_profile):
 			tools.append(_tools[tool_name]["definition"])
 	return tools
 
@@ -39,12 +39,24 @@ func call_tool(name: String, arguments: Dictionary) -> String:
 
 func is_tool_allowed(name: String, profile: String) -> bool:
 	var selected_profile := profile if profile in _profiles else "core"
-	return name in _profiles[selected_profile]
+	if not (name in _profiles[selected_profile]):
+		return false
+	if not _tools.has(name):
+		return false
+	var language_modes: Array = _tools[name].get("language_modes", ["universal"])
+	if "universal" in language_modes:
+		return true
+	var current_mode := _core_tools.detect_script_language_mode()
+	return current_mode in language_modes
 
 
 func get_tool_names(profile: String) -> Array:
 	var selected_profile := profile if profile in _profiles else "core"
-	return _profiles[selected_profile].duplicate()
+	var names: Array = []
+	for tool_name in _profiles[selected_profile]:
+		if is_tool_allowed(tool_name, selected_profile):
+			names.append(tool_name)
+	return names
 
 
 func _register_tools() -> void:
@@ -133,14 +145,28 @@ func _register_tools() -> void:
 		"type": "object",
 		"properties": {
 			"path": {"type": "string"},
+			"language": {"type": "string", "enum": ["auto", "gdscript", "dotnet", "csharp"], "default": "auto"},
 			"extends": {"type": "string", "default": "Node"},
 			"class_name": {"type": "string"},
+			"namespace": {"type": "string"},
 			"body": {"type": "string"},
 			"tool": {"type": "boolean", "default": false},
+			"partial": {"type": "boolean", "default": true},
+			"include_system": {"type": "boolean", "default": false},
 			"open_in_editor": {"type": "boolean", "default": true},
 		},
 		"required": ["path"],
 	}, "create_script", ["core", "full"])
+	_register_tool("list_scripts", "List project scripts for the active or requested language.", {
+		"type": "object",
+		"properties": {
+			"path": {"type": "string", "default": "res://"},
+			"language": {"type": "string", "enum": ["auto", "gdscript", "dotnet", "mixed"], "default": "auto"},
+			"recursive": {"type": "boolean", "default": true},
+			"max_entries": {"type": "integer", "default": 300},
+		},
+	}, "list_scripts", ["core", "full"])
+	_register_tool("get_dotnet_project_info", "Return Godot .NET project metadata, .csproj/.sln files, and C# script inventory.", _empty_schema(), "get_dotnet_project_info", ["core", "full"], ["dotnet", "mixed"])
 	_register_tool("edit_script", "Overwrite a script file with new contents.", {
 		"type": "object",
 		"properties": {
@@ -240,16 +266,26 @@ func _register_tools() -> void:
 			"filter": {"type": "string"},
 		},
 	}, "get_console_logs", ["core", "full"])
-	_register_tool("validate_gdscript_file", "Compile-check a GDScript file using GDScript.reload().", {
+	_register_tool("validate_script", "Validate a GDScript or C# script using the active/requested language workflow.", {
 		"type": "object",
-		"properties": {"path": {"type": "string"}},
+		"properties": {
+			"path": {"type": "string"},
+			"language": {"type": "string", "enum": ["auto", "gdscript", "dotnet", "csharp"], "default": "auto"},
+			"run_build": {"type": "boolean", "default": false},
+			"target": {"type": "string"},
+			"configuration": {"type": "string", "default": "Debug"},
+		},
 		"required": ["path"],
-	}, "validate_gdscript_file", ["core", "full"])
+	}, "validate_script", ["core", "full"])
 	_register_tool("get_script_errors", "Compile-check GDScript files under a path and return files that fail to reload.", {
 		"type": "object",
 		"properties": {
 			"path": {"type": "string", "default": "res://"},
+			"language": {"type": "string", "enum": ["auto", "gdscript", "dotnet", "mixed"], "default": "auto"},
 			"max_files": {"type": "integer", "default": 200},
+			"run_build": {"type": "boolean", "default": true},
+			"target": {"type": "string"},
+			"configuration": {"type": "string", "default": "Debug"},
 		},
 	}, "get_script_errors", ["core", "full"])
 	_register_tool("request_script_reload", "Reload one script or rescan the Godot resource filesystem.", {
@@ -265,6 +301,119 @@ func _register_tools() -> void:
 		"required": ["message"],
 	}, "log_message", ["core", "full"])
 	_register_tool("list_project_features", "Return project settings such as main scene, input actions, and autoloads.", _empty_schema(), "list_project_features", ["core", "full"])
+	_register_tool("list_project_settings", "List ProjectSettings entries, optionally filtered by prefix.", {
+		"type": "object",
+		"properties": {
+			"prefix": {"type": "string"},
+			"include_internal": {"type": "boolean", "default": false},
+			"max_results": {"type": "integer", "default": 500},
+		},
+	}, "list_project_settings", ["core", "full"])
+	_register_tool("get_project_setting", "Read a single ProjectSettings value.", {
+		"type": "object",
+		"properties": {"key": {"type": "string"}},
+		"required": ["key"],
+	}, "get_project_setting", ["core", "full"])
+	_register_tool("set_project_setting", "Write a ProjectSettings value and optionally save project.godot.", {
+		"type": "object",
+		"properties": {
+			"key": {"type": "string"},
+			"value": {},
+			"save": {"type": "boolean", "default": true},
+		},
+		"required": ["key", "value"],
+	}, "set_project_setting", ["full"])
+	_register_tool("list_input_actions", "List InputMap actions and their configured events.", _empty_schema(), "list_input_actions", ["core", "full"])
+	_register_tool("get_input_action", "Read one InputMap action and its configured events.", {
+		"type": "object",
+		"properties": {"action": {"type": "string"}},
+		"required": ["action"],
+	}, "get_input_action", ["core", "full"])
+	_register_tool("add_input_action", "Create an InputMap action and optionally add events.", {
+		"type": "object",
+		"properties": {
+			"action": {"type": "string"},
+			"deadzone": {"type": "number", "default": 0.2},
+			"events": {"type": "array"},
+			"save": {"type": "boolean", "default": true},
+		},
+		"required": ["action"],
+	}, "add_input_action", ["full"])
+	_register_tool("remove_input_action", "Remove an InputMap action.", {
+		"type": "object",
+		"properties": {
+			"action": {"type": "string"},
+			"save": {"type": "boolean", "default": true},
+		},
+		"required": ["action"],
+	}, "remove_input_action", ["full"])
+	_register_tool("add_input_event_to_action", "Add an InputEvent to an existing InputMap action.", {
+		"type": "object",
+		"properties": {
+			"action": {"type": "string"},
+			"event": {"type": "object"},
+			"save": {"type": "boolean", "default": true},
+		},
+		"required": ["action", "event"],
+	}, "add_input_event_to_action", ["full"])
+	_register_tool("clear_input_events", "Remove all configured events from an InputMap action.", {
+		"type": "object",
+		"properties": {
+			"action": {"type": "string"},
+			"save": {"type": "boolean", "default": true},
+		},
+		"required": ["action"],
+	}, "clear_input_events", ["full"])
+	_register_tool("list_autoloads", "List configured autoload singletons from ProjectSettings.", _empty_schema(), "list_autoloads", ["core", "full"])
+	_register_tool("set_autoload", "Add or update an autoload ProjectSettings entry.", {
+		"type": "object",
+		"properties": {
+			"name": {"type": "string"},
+			"path": {"type": "string"},
+			"value": {"type": "string"},
+			"save": {"type": "boolean", "default": true},
+		},
+		"required": ["name", "path"],
+	}, "set_autoload", ["full"])
+	_register_tool("remove_autoload", "Remove an autoload ProjectSettings entry.", {
+		"type": "object",
+		"properties": {
+			"name": {"type": "string"},
+			"save": {"type": "boolean", "default": true},
+		},
+		"required": ["name"],
+	}, "remove_autoload", ["full"])
+	_register_tool("assert_node_exists", "Assert that a node exists or does not exist.", {
+		"type": "object",
+		"properties": {
+			"node_path": {"type": "string"},
+			"should_exist": {"type": "boolean", "default": true},
+		},
+		"required": ["node_path"],
+	}, "assert_node_exists", ["core", "full"])
+	_register_tool("assert_node_property", "Assert that a node property equals the expected value.", {
+		"type": "object",
+		"properties": {
+			"node_path": {"type": "string"},
+			"property": {"type": "string"},
+			"expected": {},
+		},
+		"required": ["node_path", "property", "expected"],
+	}, "assert_node_property", ["core", "full"])
+	_register_tool("assert_signal_connected", "Assert that a source signal is connected to a target method.", {
+		"type": "object",
+		"properties": {
+			"source_path": {"type": "string"},
+			"signal_name": {"type": "string"},
+			"target_path": {"type": "string"},
+			"method_name": {"type": "string"},
+		},
+		"required": ["source_path", "signal_name", "target_path", "method_name"],
+	}, "assert_signal_connected", ["core", "full"])
+	_register_tool("wait_msec", "Block for a short duration in milliseconds. Use sparingly for simple stabilization steps.", {
+		"type": "object",
+		"properties": {"duration": {"type": "integer", "default": 16}},
+	}, "wait_msec", ["core", "full"])
 	_register_tool("capture_editor_view", "Capture the editor 2D or 3D viewport and optionally return a PNG data URI.", {
 		"type": "object",
 		"properties": {
@@ -746,7 +895,7 @@ func _register_tools() -> void:
 	}, "set_addon_enabled", ["full"])
 
 
-func _register_tool(name: String, description: String, input_schema: Dictionary, method_name: String, profiles: Array) -> void:
+func _register_tool(name: String, description: String, input_schema: Dictionary, method_name: String, profiles: Array, language_modes: Array = ["universal"]) -> void:
 	_tools[name] = {
 		"definition": {
 			"name": name,
@@ -754,6 +903,7 @@ func _register_tool(name: String, description: String, input_schema: Dictionary,
 			"inputSchema": input_schema,
 		},
 		"handler": Callable(_core_tools, method_name),
+		"language_modes": language_modes,
 	}
 
 	for profile_name in profiles:

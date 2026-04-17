@@ -23,6 +23,8 @@
 
 Funplay MCP for Godot 是一个采用 MIT 协议的 Godot 编辑器 MCP 服务器，让 Claude Code、Cursor、Windsurf、Codex、VS Code Copilot 等 AI 助手直接操作正在运行的 Godot 项目。
 
+这个插件既可用于标准 Godot `4.2+` 项目，也可以运行在 **Godot .NET** 项目中。当前实现主体仍然是 GDScript，脚本类工具会按项目语言自动暴露：GDScript 项目显示 GDScript 工作流，.NET 项目显示 C#/.NET 工作流，混合项目按需同时开放。
+
 一句话描述你的游戏或工具 —— AI 助手就能通过 Funplay MCP for Godot 的内置工具完成场景创建、脚本生成、UI 搭建、运行态验证、输入模拟、动画设置、相机控制、性能检查和编辑器自动化。
 
 > *"做一个带血条、弹药显示、暂停菜单和受击闪屏的俯视角射击游戏 HUD"*
@@ -157,8 +159,8 @@ url = "http://127.0.0.1:8765/"
 
 ## 核心特性
 
-- **87 个内置工具** — 覆盖场景编辑、PackedScene、脚本、文件、运行态控制、输入模拟、UI 控件、动画、相机、性能、Resources、Prompts 与编辑器自动化
-- **Resources 与 Prompts** — 暴露实时项目上下文、场景/选择/错误资源、资源模板，以及常见 Godot 工作流的可复用 MCP Prompt
+- **105 个内置工具** — 覆盖场景编辑、PackedScene、语言感知脚本工具、项目设置、InputMap、autoload、运行断言、文件、运行态控制、UI 控件、动画、相机、性能、Resources、Prompts 与编辑器自动化
+- **Resources 与 Prompts** — 暴露实时项目上下文、场景/选择/错误资源、语言感知脚本诊断、适用时的 `.NET` 项目资源、资源模板，以及常见 Godot 工作流的可复用 MCP Prompt
 - **输入模拟 + 视图截图验证** — 在 Play Mode 中模拟 action / 键盘 / 鼠标 / 拖拽，再用编辑器视图截图验证结果
 - **一键客户端配置** — 直接在 Godot Dock 中为 Codex、Claude Code、Cursor、VS Code 生成并写入 MCP 配置
 - **UI/Control 工具链** — 可直接构建 CanvasLayer / Control 树、设置布局、覆盖 Theme、连接信号并搭建 HUD
@@ -182,24 +184,25 @@ url = "http://127.0.0.1:8765/"
 
 当前开源包有四层高价值能力：
 
-- **Tools** — 共 87 个工具，覆盖场景、脚本、文件、UI、动画、相机、诊断与自动化
+- **Tools** — 共 105 个注册工具，覆盖场景、脚本、项目配置、输入映射、autoload、运行断言、文件、UI、动画、相机、诊断与自动化。脚本相关工具会按检测到的项目语言过滤。
 - **Primary execution** — `execute_code` 用于复杂编辑器/运行态编排
 - **Prompts** — 包括 `scene_review`、`feature_plan`、`runtime_debug`、`script_patch`、`ui_layout_plan` 等工作流 Prompt
 - **Resources** — 项目上下文、场景摘要、选择状态、日志、脚本错误、运行状态、项目特性、MCP 交互记录，以及文件模板资源
 
 ## 内置工具
 
-Funplay MCP for Godot 当前提供 **87 个工具函数**，覆盖这些工作流分组：
+Funplay MCP for Godot 当前提供 **105 个注册工具函数**，覆盖这些工作流分组。实际暴露给 AI 客户端的脚本工具会按检测到的项目语言过滤：
 
 | 分类 | 工具 |
 |------|------|
 | **场景** | `get_scene_info`, `get_scene_tree`, `list_scenes`, `open_scene`, `save_scene`, `save_scene_as`, `create_new_scene`, `instantiate_scene`, `create_packed_scene_from_node`, `get_packed_scene_info` |
 | **节点** | `get_node_info`, `find_nodes`, `select_node`, `create_node`, `duplicate_node`, `rename_node`, `reparent_node`, `remove_node`, `set_node_property`, `set_node_properties`, `set_transform_2d`, `set_transform_3d`, `set_node_script` |
 | **节点反射** | `list_node_properties`, `list_node_signals`, `list_node_methods` |
-| **脚本** | `create_script`, `edit_script`, `patch_script`, `open_script`, `validate_gdscript_file`, `get_script_errors`, `request_script_reload` |
+| **脚本** | `create_script`, `list_scripts`, `edit_script`, `patch_script`, `open_script`, `validate_script`, `get_script_errors`, `request_script_reload`；`.NET` 项目额外暴露 `get_dotnet_project_info` |
+| **项目设置 / 输入 / Autoload** | `list_project_settings`, `get_project_setting`, `set_project_setting`, `list_input_actions`, `get_input_action`, `add_input_action`, `remove_input_action`, `add_input_event_to_action`, `clear_input_events`, `list_autoloads`, `set_autoload`, `remove_autoload` |
 | **文件** | `read_file`, `write_file`, `search_files`, `list_files`, `file_exists`, `delete_file`, `move_file`, `copy_file` |
 | **运行 / 输入** | `get_play_state`, `enter_play_mode`, `play_main_scene`, `exit_play_mode`, `simulate_action`, `simulate_key_event`, `simulate_mouse_button`, `simulate_mouse_drag`, `simulate_input_sequence`, `get_time_scale`, `set_time_scale` |
-| **性能 / 日志** | `get_performance_snapshot`, `analyze_scene_complexity`, `get_console_logs`, `log_message` |
+| **断言 / 诊断** | `assert_node_exists`, `assert_node_property`, `assert_signal_connected`, `wait_msec`, `get_performance_snapshot`, `analyze_scene_complexity`, `get_console_logs`, `log_message` |
 | **动画** | `create_animation_player`, `create_animation_clip`, `add_animation_track`, `list_animations`, `play_animation` |
 | **相机** | `get_camera_info`, `set_camera_2d`, `set_camera_3d` |
 | **材质** | `create_material`, `assign_material` |

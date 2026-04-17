@@ -20,7 +20,7 @@ func set_interaction_log_getter(getter: Callable) -> void:
 
 
 func list_resources() -> Array:
-	return [
+	var resources := [
 		{
 			"uri": "godot://project/context",
 			"name": "Project Context",
@@ -54,7 +54,7 @@ func list_resources() -> Array:
 		{
 			"uri": "godot://scripts/errors",
 			"name": "Script Errors",
-			"description": "GDScript reload/compile check summary.",
+			"description": "Script validation summary for the active project language.",
 			"mimeType": "application/json",
 		},
 		{
@@ -82,6 +82,15 @@ func list_resources() -> Array:
 			"mimeType": "application/json",
 		},
 	]
+	var language_mode := _core_tools.detect_script_language_mode()
+	if language_mode == "dotnet" or language_mode == "mixed":
+		resources.append({
+			"uri": "godot://dotnet/project",
+			"name": "Dotnet Project",
+			"description": "Godot .NET project metadata, C# files, and project files.",
+			"mimeType": "application/json",
+		})
+	return resources
 
 
 func list_resource_templates() -> Array:
@@ -114,6 +123,8 @@ func read_resource(uri: String) -> Dictionary:
 		return _content_response(uri, _core_tools.get_console_logs({}), "application/json")
 	if uri == "godot://scripts/errors":
 		return _content_response(uri, _core_tools.get_script_errors({}), "application/json")
+	if uri == "godot://dotnet/project":
+		return _content_response(uri, _core_tools.get_dotnet_project_info({}), "application/json")
 	if uri == "godot://project/features":
 		return _content_response(uri, _core_tools.list_project_features({}), "application/json")
 	if uri == "godot://play/state":

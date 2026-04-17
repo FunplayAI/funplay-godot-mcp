@@ -5,7 +5,7 @@ const FunplayHttpTransport = preload("res://addons/funplay_mcp/core/funplay_http
 const FunplayMcpRequestHandler = preload("res://addons/funplay_mcp/core/funplay_mcp_request_handler.gd")
 
 const SERVER_NAME := "Funplay MCP Server - Godot"
-const SERVER_VERSION := "0.3.0"
+const SERVER_VERSION := "0.4.0"
 const DEFAULT_PORT := 8765
 const MAX_LOG_ENTRIES := 50
 
