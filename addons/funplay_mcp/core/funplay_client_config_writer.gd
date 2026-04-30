@@ -95,9 +95,24 @@ func _configure_json_target(target: Dictionary) -> Dictionary:
 	var root := {}
 	if FileAccess.file_exists(path):
 		var text := FileAccess.get_file_as_string(path)
-		var parsed = JSON.parse_string(text)
-		if parsed is Dictionary:
-			root = parsed
+		if text.strip_edges() != "":
+			var parser := JSON.new()
+			var parse_err := parser.parse(text)
+			if parse_err != OK:
+				return {
+					"ok": false,
+					"message": "Config JSON is invalid and was not modified: %s (line %d: %s)" % [
+						path,
+						parser.get_error_line(),
+						parser.get_error_message(),
+					],
+				}
+			if not (parser.data is Dictionary):
+				return {
+					"ok": false,
+					"message": "Config JSON root must be an object and was not modified: %s" % path,
+				}
+			root = parser.data
 
 	var servers = root.get(root_key, {})
 	if not (servers is Dictionary):
@@ -108,7 +123,7 @@ func _configure_json_target(target: Dictionary) -> Dictionary:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		return {"ok": false, "message": "Failed to open config for writing: %s" % path}
-	file.store_string(JSON.stringify(root, "\t"))
+	file.store_string(JSON.stringify(root, "\t") + "\n")
 	return {"ok": true, "message": "Configuration written to %s" % path}
 
 
@@ -127,7 +142,9 @@ func _configure_toml_target(target: Dictionary) -> Dictionary:
 	else:
 		if content != "" and not content.ends_with("\n"):
 			content += "\n"
-		content += "\n" + section_text
+		if content != "":
+			content += "\n"
+		content += section_text
 
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:

@@ -583,6 +583,8 @@ func patch_script(arguments: Dictionary) -> String:
 	var append_text := str(arguments.get("append", ""))
 
 	if find_text != "":
+		if not content.contains(find_text):
+			return "Error: Patch text was not found in %s." % path
 		content = content.replace(find_text, replace_text)
 	if prepend_text != "":
 		content = prepend_text + content
@@ -2240,7 +2242,7 @@ func assert_signal_connected(arguments: Dictionary) -> String:
 
 
 func wait_msec(arguments: Dictionary) -> String:
-	var duration := max(int(arguments.get("duration", 0)), 0)
+	var duration := clamp(int(arguments.get("duration", 0)), 0, 30000)
 	OS.delay_msec(duration)
 	return _render_variant({
 		"duration": duration,
@@ -2278,12 +2280,14 @@ func validate_gdscript_file(arguments: Dictionary) -> String:
 
 	var source := FileAccess.get_file_as_string(path)
 	var script := GDScript.new()
+	script.resource_path = path
 	script.source_code = source
 	var err := script.reload()
 	return _render_variant({
 		"path": path,
 		"ok": err == OK,
 		"error_code": err,
+		"resource_path": script.resource_path,
 	})
 
 

@@ -2,7 +2,7 @@
 extends RefCounted
 
 const SUPPORTED_PROTOCOL_VERSIONS := [
-	"2025-11-05",
+	"2025-11-25",
 	"2025-06-18",
 	"2025-03-26",
 	"2024-11-05",
@@ -35,6 +35,9 @@ func handle_request(request: Dictionary) -> Variant:
 		return _error_response(request.get("id"), -32600, "Invalid Request: jsonrpc must be '2.0'")
 
 	var method := str(request.get("method", ""))
+	if method.strip_edges() == "":
+		return _error_response(request.get("id"), -32600, "Invalid Request: method is required")
+
 	var params = request.get("params", {})
 	if not (params is Dictionary):
 		params = {}
@@ -125,6 +128,10 @@ func _handle_tool_call(request: Dictionary, params: Dictionary) -> Dictionary:
 	var tool_name := str(params.get("name", "")).strip_edges()
 	if tool_name == "":
 		return _error_response(request.get("id"), -32602, "Invalid params: 'name' is required")
+	if not _tool_registry.has_tool(tool_name):
+		return _error_response(request.get("id"), -32602, "Invalid params: unknown tool '%s'" % tool_name)
+	if not _tool_registry.is_tool_allowed(tool_name, _settings.tool_profile):
+		return _error_response(request.get("id"), -32602, "Invalid params: tool '%s' is not exposed by profile '%s'" % [tool_name, _settings.tool_profile])
 
 	var arguments = params.get("arguments", {})
 	if not (arguments is Dictionary):
@@ -143,8 +150,17 @@ func _handle_tool_call(request: Dictionary, params: Dictionary) -> Dictionary:
 		"jsonrpc": "2.0",
 		"result": {
 			"content": _build_content(result_text),
+			"isError": status == "error",
 		},
 	}
+
+
+func is_protocol_version_supported(version: String) -> bool:
+	return version.strip_edges() in SUPPORTED_PROTOCOL_VERSIONS
+
+
+func get_default_protocol_version() -> String:
+	return SUPPORTED_PROTOCOL_VERSIONS[0]
 
 
 func _error_response(request_id, code: int, message: String) -> Dictionary:

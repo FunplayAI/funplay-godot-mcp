@@ -5,7 +5,7 @@ const FunplayHttpTransport = preload("res://addons/funplay_mcp/core/funplay_http
 const FunplayMcpRequestHandler = preload("res://addons/funplay_mcp/core/funplay_mcp_request_handler.gd")
 
 const SERVER_NAME := "Funplay MCP Server - Godot"
-const SERVER_VERSION := "0.4.0"
+const SERVER_VERSION := "0.4.1"
 const DEFAULT_PORT := 8765
 const MAX_LOG_ENTRIES := 50
 
@@ -107,7 +107,7 @@ func add_interaction(name: String, status: String, message: String) -> void:
 		_interaction_log.resize(MAX_LOG_ENTRIES)
 
 
-func _handle_http_request(method: String, path: String, body_text: String) -> Dictionary:
+func _handle_http_request(method: String, path: String, body_text: String, headers: Dictionary = {}) -> Dictionary:
 	if method == "GET":
 		if path == "/" or path == "/health":
 			return {
@@ -118,6 +118,7 @@ func _handle_http_request(method: String, path: String, body_text: String) -> Di
 					"version": SERVER_VERSION,
 					"endpoint": get_endpoint(),
 					"tool_profile": _settings.tool_profile,
+					"protocol_version": _request_handler.get_default_protocol_version(),
 				}),
 			}
 		return {
@@ -131,6 +132,21 @@ func _handle_http_request(method: String, path: String, body_text: String) -> Di
 			"status": 405,
 			"content_type": "text/plain",
 			"body": "Method Not Allowed",
+		}
+
+	var protocol_version := str(headers.get("mcp-protocol-version", "")).strip_edges()
+	if protocol_version != "" and not _request_handler.is_protocol_version_supported(protocol_version):
+		return {
+			"status": 400,
+			"content_type": "application/json",
+			"body": JSON.stringify({
+				"jsonrpc": "2.0",
+				"id": null,
+				"error": {
+					"code": -32600,
+					"message": "Unsupported MCP-Protocol-Version: %s" % protocol_version,
+				},
+			}),
 		}
 
 	var request = JSON.parse_string(body_text)

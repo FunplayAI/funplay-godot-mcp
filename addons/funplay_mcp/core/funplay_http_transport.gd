@@ -1,6 +1,10 @@
 @tool
 extends RefCounted
 
+const MAX_HEADER_BYTES := 32768
+const MAX_BODY_BYTES := 8 * 1024 * 1024
+const REQUEST_TIMEOUT_MSEC := 10000
+
 var _server := TCPServer.new()
 var _connections: Array = []
 var _is_listening := false
@@ -51,6 +55,8 @@ func poll(request_callback: Callable) -> void:
 			"content_length": 0,
 			"method": "",
 			"path": "/",
+			"headers": {},
+			"started_msec": Time.get_ticks_msec(),
 		})
 
 	for index in range(_connections.size() - 1, -1, -1):
@@ -59,6 +65,12 @@ func poll(request_callback: Callable) -> void:
 		peer.poll()
 
 		if peer.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+			_connections.remove_at(index)
+			continue
+
+		if Time.get_ticks_msec() - int(connection.get("started_msec", 0)) > REQUEST_TIMEOUT_MSEC:
+			_send_response(peer, _text_response(408, "Request Timeout"))
+			peer.disconnect_from_host()
 			_connections.remove_at(index)
 			continue
 
@@ -71,13 +83,23 @@ func poll(request_callback: Callable) -> void:
 			var buffer_text: String = connection["buffer"]
 			var header_end := buffer_text.find("\r\n\r\n")
 			if header_end == -1:
+				if buffer_text.to_utf8_buffer().size() > MAX_HEADER_BYTES:
+					_send_response(peer, _text_response(431, "Request Header Fields Too Large"))
+					peer.disconnect_from_host()
+					_connections.remove_at(index)
 				continue
 			var header_text := buffer_text.substr(0, header_end)
 			var parsed := _parse_headers(header_text)
+			if int(parsed.get("status", 200)) != 200:
+				_send_response(peer, _text_response(int(parsed.get("status", 400)), str(parsed.get("message", "Bad Request"))))
+				peer.disconnect_from_host()
+				_connections.remove_at(index)
+				continue
 			connection["headers_parsed"] = true
 			connection["content_length"] = parsed["content_length"]
 			connection["method"] = parsed["method"]
 			connection["path"] = parsed["path"]
+			connection["headers"] = parsed["headers"]
 			_connections[index] = connection
 
 		var full_text: String = connection["buffer"]
@@ -89,7 +111,12 @@ func poll(request_callback: Callable) -> void:
 		if body_text.to_utf8_buffer().size() < int(connection["content_length"]):
 			continue
 
-		var response := request_callback.call(str(connection["method"]), str(connection["path"]), body_text)
+		var response := request_callback.call(
+			str(connection["method"]),
+			str(connection["path"]),
+			body_text,
+			connection.get("headers", {})
+		)
 		_send_response(peer, response)
 		peer.disconnect_from_host()
 		_connections.remove_at(index)
@@ -100,6 +127,7 @@ func _parse_headers(header_text: String) -> Dictionary:
 	var method := "POST"
 	var path := "/"
 	var content_length := 0
+	var headers := {}
 
 	if lines.size() > 0:
 		var request_line := lines[0].split(" ")
@@ -114,13 +142,31 @@ func _parse_headers(header_text: String) -> Dictionary:
 			continue
 		var key := line.substr(0, separator).strip_edges().to_lower()
 		var value := line.substr(separator + 1).strip_edges()
+		headers[key] = value
 		if key == "content-length":
+			if not value.is_valid_int():
+				return {
+					"status": 400,
+					"message": "Bad Request: invalid Content-Length",
+				}
 			content_length = int(value)
+			if content_length < 0:
+				return {
+					"status": 400,
+					"message": "Bad Request: invalid Content-Length",
+				}
+			if content_length > MAX_BODY_BYTES:
+				return {
+					"status": 413,
+					"message": "Payload Too Large",
+				}
 
 	return {
+		"status": 200,
 		"method": method,
 		"path": path,
 		"content_length": content_length,
+		"headers": headers,
 	}
 
 
@@ -141,6 +187,12 @@ func _send_response(peer: StreamPeerTCP, response: Dictionary) -> void:
 			status_text = "Not Found"
 		405:
 			status_text = "Method Not Allowed"
+		408:
+			status_text = "Request Timeout"
+		413:
+			status_text = "Payload Too Large"
+		431:
+			status_text = "Request Header Fields Too Large"
 		500:
 			status_text = "Internal Server Error"
 
@@ -155,3 +207,11 @@ func _send_response(peer: StreamPeerTCP, response: Dictionary) -> void:
 	]
 	var response_text := "\r\n".join(headers) + body
 	peer.put_data(response_text.to_utf8_buffer())
+
+
+func _text_response(status: int, body: String) -> Dictionary:
+	return {
+		"status": status,
+		"content_type": "text/plain",
+		"body": body,
+	}

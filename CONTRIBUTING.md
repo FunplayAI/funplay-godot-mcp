@@ -29,12 +29,13 @@ Thanks for your interest in contributing! Here's how to get started.
 
 Before submitting a PR, please verify the change in a Godot test project:
 
-1. Enable the plugin and start the MCP server
-2. Confirm the MCP server starts successfully
-3. Run at least one read-only workflow such as `get_scene_info`
-4. If your change affects scene editing, run at least one write workflow such as `create_node`
-5. If your change affects scripts, validate it with `validate_gdscript_file` or `get_script_errors`
-6. If your change affects play mode, confirm the related workflow inside the Godot editor
+1. Run `python scripts/validate_repo.py`
+2. Enable the plugin and start the MCP server
+3. Confirm the MCP server starts successfully
+4. Run at least one read-only workflow such as `get_scene_info`
+5. If your change affects scene editing, run at least one write workflow such as `create_node`
+6. If your change affects scripts, validate it with `validate_gdscript_file` or `get_script_errors`
+7. If your change affects play mode, confirm the related workflow inside the Godot editor
 
 ## Repository Hygiene
 

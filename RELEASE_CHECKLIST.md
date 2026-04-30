@@ -9,6 +9,7 @@ Use this checklist before publishing a new open-source release of Funplay MCP fo
 - [ ] `addons/funplay_mcp/plugin.cfg` version matches the intended release
 - [ ] `CHANGELOG.md` includes the release notes for the target version
 - [ ] `README.md` and `README_CN.md` match the current product behavior
+- [ ] `python scripts/validate_repo.py` passes locally
 
 ## 2. Godot Smoke Test
 

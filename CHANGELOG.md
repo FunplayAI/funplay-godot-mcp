@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.1] - 2026-04-30
+
+### Fixed
+- Updated MCP protocol negotiation to advertise the current `2025-11-25` protocol version
+- Marked failed tool calls with MCP `isError` and return JSON-RPC errors for unknown or hidden tools
+- Prevented one-click JSON client configuration from overwriting invalid existing config files
+- Added resource-path context to GDScript validation and made `patch_script` fail when replacement text is absent
+
+### Changed
+- Added request size, header size, and timeout limits to the embedded HTTP transport
+- Added a reusable repository validation script and wired CI to check versions, protocol defaults, and tool registry consistency
+
 ## [0.4.0] - 2026-04-17
 
 ### Added

@@ -37,6 +37,10 @@ func call_tool(name: String, arguments: Dictionary) -> String:
 	return _tools[name]["handler"].call(arguments)
 
 
+func has_tool(name: String) -> bool:
+	return _tools.has(name)
+
+
 func is_tool_allowed(name: String, profile: String) -> bool:
 	var selected_profile := profile if profile in _profiles else "core"
 	if not (name in _profiles[selected_profile]):
@@ -412,7 +416,7 @@ func _register_tools() -> void:
 	}, "assert_signal_connected", ["core", "full"])
 	_register_tool("wait_msec", "Block for a short duration in milliseconds. Use sparingly for simple stabilization steps.", {
 		"type": "object",
-		"properties": {"duration": {"type": "integer", "default": 16}},
+		"properties": {"duration": {"type": "integer", "default": 16, "minimum": 0, "maximum": 30000}},
 	}, "wait_msec", ["core", "full"])
 	_register_tool("capture_editor_view", "Capture the editor 2D or 3D viewport and optionally return a PNG data URI.", {
 		"type": "object",

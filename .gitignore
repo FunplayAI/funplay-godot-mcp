@@ -5,3 +5,5 @@ export_presets.cfg
 *.tmp
 *.swp
 *.DS_Store
+__pycache__/
+*.pyc
