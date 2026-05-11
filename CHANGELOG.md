@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.2] - 2026-05-11
+
+### Added
+- Added low-level `ProjectSettings` tools for listing, reading, and writing project settings directly through MCP
+- Added low-level `InputMap` tools for listing actions, reading action bindings, creating/removing actions, and editing input events
+- Added low-level `autoload` tools for listing, adding, updating, and removing autoload entries
+- Added runtime assertion helpers for node existence, node property equality, and signal connectivity
+- Added `wait_msec` for small stabilization steps in low-level editor and runtime automation flows
+- Added project-configuration resources for project settings, input actions, and autoloads
+
+### Changed
+- Completed the low-level implementations behind the already-exposed project/input/autoload/assertion tool surface
+
 ## [0.4.1] - 2026-04-30
 
 ### Fixed

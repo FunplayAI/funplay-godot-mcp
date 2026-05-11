@@ -64,6 +64,24 @@ func list_resources() -> Array:
 			"mimeType": "application/json",
 		},
 		{
+			"uri": "godot://project/settings",
+			"name": "Project Settings",
+			"description": "ProjectSettings entries and their current values.",
+			"mimeType": "application/json",
+		},
+		{
+			"uri": "godot://input/actions",
+			"name": "Input Actions",
+			"description": "InputMap actions and configured input events.",
+			"mimeType": "application/json",
+		},
+		{
+			"uri": "godot://autoloads/list",
+			"name": "Autoloads",
+			"description": "Configured project autoload singletons.",
+			"mimeType": "application/json",
+		},
+		{
 			"uri": "godot://play/state",
 			"name": "Play State",
 			"description": "Current play-mode state and time scale.",
@@ -127,6 +145,12 @@ func read_resource(uri: String) -> Dictionary:
 		return _content_response(uri, _core_tools.get_dotnet_project_info({}), "application/json")
 	if uri == "godot://project/features":
 		return _content_response(uri, _core_tools.list_project_features({}), "application/json")
+	if uri == "godot://project/settings":
+		return _content_response(uri, _core_tools.list_project_settings({}), "application/json")
+	if uri == "godot://input/actions":
+		return _content_response(uri, _core_tools.list_input_actions({}), "application/json")
+	if uri == "godot://autoloads/list":
+		return _content_response(uri, _core_tools.list_autoloads({}), "application/json")
 	if uri == "godot://play/state":
 		return _content_response(uri, _core_tools.get_play_state({}), "application/json")
 	if uri == "godot://performance/snapshot":

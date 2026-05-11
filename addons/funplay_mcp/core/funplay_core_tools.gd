@@ -2058,12 +2058,13 @@ func set_project_setting(arguments: Dictionary) -> String:
 	if not arguments.has("value"):
 		return "Error: 'value' is required."
 	ProjectSettings.set_setting(key, arguments.get("value"))
-	if bool(arguments.get("save", true)):
+	var save_changes := bool(arguments.get("save", true))
+	if save_changes:
 		ProjectSettings.save()
 	return _render_variant({
 		"key": key,
 		"value": _json_safe(ProjectSettings.get_setting(key)),
-		"saved": bool(arguments.get("save", true)),
+		"saved": save_changes,
 	})
 
 
@@ -2092,15 +2093,14 @@ func add_input_action(arguments: Dictionary) -> String:
 		return "Error: 'action' is required."
 	if not InputMap.has_action(action_name):
 		InputMap.add_action(action_name, float(arguments.get("deadzone", 0.2)))
-	if arguments.has("events"):
-		var events = arguments.get("events")
-		if events is Array:
-			for event_data in events:
-				if event_data is Dictionary:
-					var event = _input_event_from_dict(event_data)
-					if event != null:
-						InputMap.action_add_event(action_name, event)
-	if bool(arguments.get("save", true)):
+	var events = arguments.get("events", [])
+	if events is Array:
+		for event_data in events:
+			var event = _input_event_from_dict(event_data)
+			if event != null:
+				InputMap.action_add_event(action_name, event)
+	var save_changes := bool(arguments.get("save", true))
+	if save_changes:
 		ProjectSettings.save()
 	return _render_variant(_build_input_action_info(action_name))
 
@@ -2112,7 +2112,8 @@ func remove_input_action(arguments: Dictionary) -> String:
 	if not InputMap.has_action(action_name):
 		return "Error: Input action not found: %s" % action_name
 	InputMap.erase_action(action_name)
-	if bool(arguments.get("save", true)):
+	var save_changes := bool(arguments.get("save", true))
+	if save_changes:
 		ProjectSettings.save()
 	return "Removed input action: %s" % action_name
 
@@ -2127,7 +2128,8 @@ func add_input_event_to_action(arguments: Dictionary) -> String:
 	if event == null:
 		return "Error: Could not build InputEvent from 'event'."
 	InputMap.action_add_event(action_name, event)
-	if bool(arguments.get("save", true)):
+	var save_changes := bool(arguments.get("save", true))
+	if save_changes:
 		ProjectSettings.save()
 	return _render_variant(_build_input_action_info(action_name))
 
@@ -2139,7 +2141,8 @@ func clear_input_events(arguments: Dictionary) -> String:
 	if not InputMap.has_action(action_name):
 		return "Error: Input action not found: %s" % action_name
 	InputMap.action_erase_events(action_name)
-	if bool(arguments.get("save", true)):
+	var save_changes := bool(arguments.get("save", true))
+	if save_changes:
 		ProjectSettings.save()
 	return _render_variant(_build_input_action_info(action_name))
 
@@ -2160,11 +2163,13 @@ func set_autoload(arguments: Dictionary) -> String:
 	var key := "autoload/%s" % name
 	var value := str(arguments.get("value", path))
 	ProjectSettings.set_setting(key, value)
-	if bool(arguments.get("save", true)):
+	var save_changes := bool(arguments.get("save", true))
+	if save_changes:
 		ProjectSettings.save()
 	return _render_variant({
 		"name": name,
 		"path": value,
+		"saved": save_changes,
 	})
 
 
@@ -2176,7 +2181,8 @@ func remove_autoload(arguments: Dictionary) -> String:
 	if not ProjectSettings.has_setting(key):
 		return "Error: Autoload not found: %s" % name
 	ProjectSettings.set_setting(key, null)
-	if bool(arguments.get("save", true)):
+	var save_changes := bool(arguments.get("save", true))
+	if save_changes:
 		ProjectSettings.save()
 	return "Removed autoload: %s" % name
 
@@ -2189,7 +2195,7 @@ func assert_node_exists(arguments: Dictionary) -> String:
 	var exists := node != null
 	var should_exist := bool(arguments.get("should_exist", true))
 	if exists != should_exist:
-		return "Error: Node existence assertion failed for '%s' (exists=%s, expected=%s)." % [node_path, str(exists), str(should_exist)]
+		return "Error: Node existence assertion failed for '%s' (exists=%s expected=%s)." % [node_path, str(exists), str(should_exist)]
 	return _render_variant({
 		"node_path": node_path,
 		"exists": exists,
@@ -2207,9 +2213,13 @@ func assert_node_property(arguments: Dictionary) -> String:
 		return "Error: Node not found: %s" % node_path
 	var actual = node.get(property_name)
 	var expected = arguments.get("expected")
-	var equals := _values_equal(actual, expected)
-	if not equals:
-		return "Error: Property assertion failed for '%s.%s'. actual=%s expected=%s" % [node_path, property_name, JSON.stringify(_json_safe(actual)), JSON.stringify(_json_safe(expected))]
+	if not _values_equal(actual, expected):
+		return "Error: Property assertion failed for '%s.%s'. actual=%s expected=%s" % [
+			node_path,
+			property_name,
+			JSON.stringify(_json_safe(actual)),
+			JSON.stringify(_json_safe(expected))
+		]
 	return _render_variant({
 		"node_path": node_path,
 		"property": property_name,
@@ -2242,7 +2252,7 @@ func assert_signal_connected(arguments: Dictionary) -> String:
 
 
 func wait_msec(arguments: Dictionary) -> String:
-	var duration := clamp(int(arguments.get("duration", 0)), 0, 30000)
+	var duration := max(int(arguments.get("duration", 0)), 0)
 	OS.delay_msec(duration)
 	return _render_variant({
 		"duration": duration,
