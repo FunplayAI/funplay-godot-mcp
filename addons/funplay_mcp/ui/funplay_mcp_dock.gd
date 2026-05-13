@@ -24,6 +24,7 @@ func setup(server, settings, client_config_writer) -> void:
 	_server = server
 	_settings = settings
 	_client_config_writer = client_config_writer
+	name = "Funplay MCP"
 	_build_ui()
 	refresh_live_state(true)
 
