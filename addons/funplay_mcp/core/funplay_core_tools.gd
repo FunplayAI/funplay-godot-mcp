@@ -411,7 +411,7 @@ func create_script(arguments: Dictionary) -> String:
 		return create_csharp_script(csharp_arguments)
 
 	var extends_name = str(arguments.get("extends", "Node")).strip_edges()
-	var class_name = str(arguments.get("class_name", "")).strip_edges()
+	var script_class_name = str(arguments.get("class_name", "")).strip_edges()
 	var body = str(arguments.get("body", "")).strip_edges()
 	var use_tool = bool(arguments.get("tool", false))
 
@@ -419,8 +419,8 @@ func create_script(arguments: Dictionary) -> String:
 	if use_tool:
 		lines.append("@tool")
 	lines.append("extends %s" % extends_name)
-	if class_name != "":
-		lines.append("class_name %s" % class_name)
+	if script_class_name != "":
+		lines.append("class_name %s" % script_class_name)
 	lines.append("")
 	if body != "":
 		lines.append(body)
@@ -480,9 +480,9 @@ func create_csharp_script(arguments: Dictionary) -> String:
 	if not path.to_lower().ends_with(".cs"):
 		return "Error: C# script path must end with .cs"
 
-	var class_name = str(arguments.get("class_name", "")).strip_edges()
-	if class_name == "":
-		class_name = _pascal_case(path.get_file().trim_suffix(".cs"))
+	var csharp_class_name = str(arguments.get("class_name", "")).strip_edges()
+	if csharp_class_name == "":
+		csharp_class_name = _pascal_case(path.get_file().trim_suffix(".cs"))
 
 	var namespace_name = str(arguments.get("namespace", "")).strip_edges()
 	var base_class = str(arguments.get("extends", "Node")).strip_edges()
@@ -501,7 +501,7 @@ func create_csharp_script(arguments: Dictionary) -> String:
 	if use_tool:
 		lines.append("[Tool]")
 	var partial_text = " partial" if use_partial else ""
-	lines.append("public%s class %s : %s" % [partial_text, class_name, base_class])
+	lines.append("public%s class %s : %s" % [partial_text, csharp_class_name, base_class])
 	lines.append("{")
 	if body != "":
 		for line in body.split("\n"):
@@ -962,12 +962,12 @@ func find_nodes(arguments: Dictionary) -> String:
 		return "Error: No scene is currently open in the editor."
 
 	var name_contains = str(arguments.get("name_contains", "")).to_lower()
-	var class_name = str(arguments.get("class_name", "")).strip_edges()
+	var node_class_name = str(arguments.get("class_name", "")).strip_edges()
 	var script_path = _normalize_path(str(arguments.get("script_path", "")))
 	var max_results = clamp(int(arguments.get("max_results", 100)), 1, 2000)
 	var results: Array = []
 
-	_find_nodes_recursive(scene_root, name_contains, class_name, script_path, max_results, results)
+	_find_nodes_recursive(scene_root, name_contains, node_class_name, script_path, max_results, results)
 	return _render_variant({
 		"count": results.size(),
 		"results": results,
@@ -3145,19 +3145,19 @@ func _analyze_node_recursive(node: Node, depth: int, stats: Dictionary) -> void:
 			_analyze_node_recursive(child, depth + 1, stats)
 
 
-func _find_nodes_recursive(node: Node, name_contains: String, class_name: String, script_path: String, max_results: int, results: Array) -> void:
+func _find_nodes_recursive(node: Node, name_contains: String, node_class_name: String, script_path: String, max_results: int, results: Array) -> void:
 	if results.size() >= max_results:
 		return
 
 	var name_ok = name_contains == "" or node.name.to_lower().contains(name_contains)
-	var class_ok = class_name == "" or node.is_class(class_name)
+	var class_ok = node_class_name == "" or node.is_class(node_class_name)
 	var script_ok = script_path == "" or (node.get_script() != null and node.get_script().resource_path == script_path)
 	if name_ok and class_ok and script_ok:
 		results.append(_node_to_summary(node))
 
 	for child in node.get_children():
 		if child is Node and results.size() < max_results:
-			_find_nodes_recursive(child, name_contains, class_name, script_path, max_results, results)
+			_find_nodes_recursive(child, name_contains, node_class_name, script_path, max_results, results)
 
 
 func _matches_extension(path: String, extensions: Array) -> bool:
