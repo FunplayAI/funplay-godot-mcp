@@ -1,12 +1,12 @@
 @tool
 extends RefCounted
 
-const SCENE_EXTENSIONS := [".tscn", ".scn"]
-const TEXT_EXTENSIONS := [
+const SCENE_EXTENSIONS = [".tscn", ".scn"]
+const TEXT_EXTENSIONS = [
 	".gd", ".gdshader", ".tres", ".tscn", ".json", ".txt", ".md",
 	".cfg", ".ini", ".toml", ".yaml", ".yml", ".shader", ".cs"
 ]
-const KEY_NAME_MAP := {
+const KEY_NAME_MAP = {
 	"enter": KEY_ENTER,
 	"escape": KEY_ESCAPE,
 	"esc": KEY_ESCAPE,
@@ -22,14 +22,14 @@ const KEY_NAME_MAP := {
 	"control": KEY_CTRL,
 	"alt": KEY_ALT,
 }
-const MOUSE_BUTTON_MAP := {
+const MOUSE_BUTTON_MAP = {
 	"left": MOUSE_BUTTON_LEFT,
 	"right": MOUSE_BUTTON_RIGHT,
 	"middle": MOUSE_BUTTON_MIDDLE,
 	"wheel_up": MOUSE_BUTTON_WHEEL_UP,
 	"wheel_down": MOUSE_BUTTON_WHEEL_DOWN,
 }
-const SIZE_FLAG_MAP := {
+const SIZE_FLAG_MAP = {
 	"fill": 1,
 	"expand": 2,
 	"expand_fill": 3,
@@ -47,11 +47,11 @@ func _init(plugin, settings) -> void:
 
 
 func execute_code(arguments: Dictionary) -> String:
-	var code := str(arguments.get("code", "")).strip_edges()
+	var code = str(arguments.get("code", "")).strip_edges()
 	if code == "":
 		return "Error: 'code' is required."
 
-	var wrapped_lines := PackedStringArray([
+	var wrapped_lines = PackedStringArray([
 		"@tool",
 		"extends RefCounted",
 		"func run(ctx):",
@@ -62,9 +62,9 @@ func execute_code(arguments: Dictionary) -> String:
 		else:
 			wrapped_lines.append("\t%s" % line)
 
-	var script := GDScript.new()
+	var script = GDScript.new()
 	script.source_code = "\n".join(wrapped_lines)
-	var reload_err := script.reload()
+	var reload_err = script.reload()
 	if reload_err != OK:
 		return "Error: Failed to compile dynamic GDScript snippet (code %s)." % str(reload_err)
 	if not script.can_instantiate():
@@ -74,8 +74,8 @@ func execute_code(arguments: Dictionary) -> String:
 	if instance == null or not instance.has_method("run"):
 		return "Error: Dynamic GDScript snippet must define run(ctx)."
 
-	var editor := _editor()
-	var context := {
+	var editor = _editor()
+	var context = {
 		"plugin": _plugin,
 		"editor_interface": editor,
 		"scene_root": editor.get_edited_scene_root(),
@@ -96,9 +96,9 @@ func execute_code(arguments: Dictionary) -> String:
 
 
 func get_project_info(_arguments: Dictionary) -> String:
-	var editor := _editor()
+	var editor = _editor()
 	var root = editor.get_edited_scene_root()
-	var info := {
+	var info = {
 		"project_name": str(ProjectSettings.get_setting("application/config/name", "")),
 		"godot_version": Engine.get_version_info(),
 		"project_root": ProjectSettings.globalize_path("res://"),
@@ -117,12 +117,12 @@ func get_project_info(_arguments: Dictionary) -> String:
 
 
 func get_scene_info(_arguments: Dictionary) -> String:
-	var editor := _editor()
+	var editor = _editor()
 	var scene_root = editor.get_edited_scene_root()
 	if scene_root == null:
 		return "Error: No scene is currently open in the editor."
 
-	var info := _build_scene_info(scene_root)
+	var info = _build_scene_info(scene_root)
 	info["open_scenes"] = editor.get_open_scenes()
 	info["is_playing_scene"] = editor.is_playing_scene()
 	info["time_scale"] = Engine.time_scale
@@ -134,7 +134,7 @@ func get_scene_tree(arguments: Dictionary) -> String:
 	if scene_root == null:
 		return "Error: No scene is currently open in the editor."
 
-	var max_depth := int(arguments.get("max_depth", 4))
+	var max_depth = int(arguments.get("max_depth", 4))
 	return _render_variant(_serialize_scene_tree(scene_root, max_depth))
 
 
@@ -146,9 +146,9 @@ func get_selection(_arguments: Dictionary) -> String:
 
 
 func list_scenes(arguments: Dictionary) -> String:
-	var root_path := _normalize_path(str(arguments.get("path", "res://")))
-	var max_entries := clamp(int(arguments.get("max_entries", 300)), 1, 3000)
-	var recursive := bool(arguments.get("recursive", true))
+	var root_path = _normalize_path(str(arguments.get("path", "res://")))
+	var max_entries = clamp(int(arguments.get("max_entries", 300)), 1, 3000)
+	var recursive = bool(arguments.get("recursive", true))
 	var scene_paths: Array = []
 	_collect_matching_files(root_path, recursive, max_entries, scene_paths, SCENE_EXTENSIONS)
 
@@ -161,7 +161,7 @@ func list_scenes(arguments: Dictionary) -> String:
 
 
 func open_scene(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 	if not FileAccess.file_exists(path):
@@ -172,11 +172,11 @@ func open_scene(arguments: Dictionary) -> String:
 
 
 func create_new_scene(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 
-	var root_type := str(arguments.get("root_type", "Node2D")).strip_edges()
+	var root_type = str(arguments.get("root_type", "Node2D")).strip_edges()
 	if not ClassDB.class_exists(root_type):
 		return "Error: Unknown Godot class '%s'." % root_type
 
@@ -189,7 +189,7 @@ func create_new_scene(arguments: Dictionary) -> String:
 	if root.name == "":
 		root.name = root_type
 
-	var script_path := _normalize_path(str(arguments.get("script_path", "")))
+	var script_path = _normalize_path(str(arguments.get("script_path", "")))
 	if script_path != "":
 		var script = load(script_path)
 		if script == null or not (script is Script):
@@ -197,18 +197,18 @@ func create_new_scene(arguments: Dictionary) -> String:
 			return "Error: Script not found or invalid: %s" % script_path
 		root.set_script(script)
 
-	var packed := PackedScene.new()
-	var pack_err := packed.pack(root)
+	var packed = PackedScene.new()
+	var pack_err = packed.pack(root)
 	if pack_err != OK:
 		root.free()
 		return "Error: Failed to pack scene (code %s)." % str(pack_err)
 
-	var ensure_err := _ensure_parent_dir(path)
+	var ensure_err = _ensure_parent_dir(path)
 	if ensure_err != OK:
 		root.free()
 		return "Error: Failed to create parent directory for %s" % path
 
-	var save_err := ResourceSaver.save(packed, path, ResourceSaver.FLAG_CHANGE_PATH)
+	var save_err = ResourceSaver.save(packed, path, ResourceSaver.FLAG_CHANGE_PATH)
 	root.free()
 	if save_err != OK:
 		return "Error: Failed to save scene to %s (code %s)." % [path, str(save_err)]
@@ -238,7 +238,7 @@ func save_scene(_arguments: Dictionary) -> String:
 
 
 func save_scene_as(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 
@@ -246,7 +246,7 @@ func save_scene_as(arguments: Dictionary) -> String:
 	if scene_root == null:
 		return "Error: No edited scene is open."
 
-	var ensure_err := _ensure_parent_dir(path)
+	var ensure_err = _ensure_parent_dir(path)
 	if ensure_err != OK:
 		return "Error: Failed to create parent directory for %s" % path
 
@@ -255,10 +255,10 @@ func save_scene_as(arguments: Dictionary) -> String:
 
 
 func list_files(arguments: Dictionary) -> String:
-	var root_path := _normalize_path(str(arguments.get("path", "res://")))
-	var recursive := bool(arguments.get("recursive", true))
-	var include_hidden := bool(arguments.get("include_hidden", false))
-	var max_entries := clamp(int(arguments.get("max_entries", 200)), 1, 4000)
+	var root_path = _normalize_path(str(arguments.get("path", "res://")))
+	var recursive = bool(arguments.get("recursive", true))
+	var include_hidden = bool(arguments.get("include_hidden", false))
+	var max_entries = clamp(int(arguments.get("max_entries", 200)), 1, 4000)
 	var results: Array = []
 
 	if DirAccess.open(root_path) == null:
@@ -273,14 +273,14 @@ func list_files(arguments: Dictionary) -> String:
 
 
 func search_files(arguments: Dictionary) -> String:
-	var root_path := _normalize_path(str(arguments.get("path", "res://")))
-	var pattern := str(arguments.get("pattern", "")).strip_edges()
+	var root_path = _normalize_path(str(arguments.get("path", "res://")))
+	var pattern = str(arguments.get("pattern", "")).strip_edges()
 	if pattern == "":
 		return "Error: 'pattern' is required."
 
-	var mode := str(arguments.get("mode", "path")).to_lower()
-	var recursive := bool(arguments.get("recursive", true))
-	var max_results := clamp(int(arguments.get("max_results", 100)), 1, 2000)
+	var mode = str(arguments.get("mode", "path")).to_lower()
+	var recursive = bool(arguments.get("recursive", true))
+	var max_results = clamp(int(arguments.get("max_results", 100)), 1, 2000)
 	var matches: Array = []
 	_search_files_recursive(root_path, pattern, mode, recursive, max_results, matches)
 
@@ -294,11 +294,11 @@ func search_files(arguments: Dictionary) -> String:
 
 
 func file_exists(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 
-	var exists := FileAccess.file_exists(path) or DirAccess.dir_exists_absolute(path) or ResourceLoader.exists(path)
+	var exists = FileAccess.file_exists(path) or DirAccess.dir_exists_absolute(path) or ResourceLoader.exists(path)
 	return _render_variant({
 		"path": path,
 		"exists": exists,
@@ -306,18 +306,18 @@ func file_exists(arguments: Dictionary) -> String:
 
 
 func read_file(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 	if not FileAccess.file_exists(path):
 		return "Error: File not found: %s" % path
 
-	var max_chars := clamp(int(arguments.get("max_chars", 12000)), 200, 500000)
-	var file := FileAccess.open(path, FileAccess.READ)
+	var max_chars = clamp(int(arguments.get("max_chars", 12000)), 200, 500000)
+	var file = FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return "Error: Failed to open file: %s" % path
 
-	var text := file.get_as_text()
+	var text = file.get_as_text()
 	if text.length() > max_chars:
 		text = text.substr(0, max_chars) + "\n...[truncated]"
 
@@ -328,16 +328,16 @@ func read_file(arguments: Dictionary) -> String:
 
 
 func write_file(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 
-	var ensure_err := _ensure_parent_dir(path)
+	var ensure_err = _ensure_parent_dir(path)
 	if ensure_err != OK:
 		return "Error: Failed to create parent directory for %s" % path
 
-	var content := str(arguments.get("content", ""))
-	var file := FileAccess.open(path, FileAccess.WRITE)
+	var content = str(arguments.get("content", ""))
+	var file = FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		return "Error: Failed to open file for writing: %s" % path
 
@@ -350,11 +350,11 @@ func write_file(arguments: Dictionary) -> String:
 
 
 func delete_file(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 
-	var err := DirAccess.remove_absolute(path)
+	var err = DirAccess.remove_absolute(path)
 	if err != OK:
 		return "Error: Failed to delete '%s' (code %s)." % [path, str(err)]
 
@@ -363,16 +363,16 @@ func delete_file(arguments: Dictionary) -> String:
 
 
 func move_file(arguments: Dictionary) -> String:
-	var from_path := _normalize_path(str(arguments.get("from_path", "")))
-	var to_path := _normalize_path(str(arguments.get("to_path", "")))
+	var from_path = _normalize_path(str(arguments.get("from_path", "")))
+	var to_path = _normalize_path(str(arguments.get("to_path", "")))
 	if from_path == "" or to_path == "":
 		return "Error: 'from_path' and 'to_path' are required."
 
-	var ensure_err := _ensure_parent_dir(to_path)
+	var ensure_err = _ensure_parent_dir(to_path)
 	if ensure_err != OK:
 		return "Error: Failed to create parent directory for %s" % to_path
 
-	var err := DirAccess.rename_absolute(from_path, to_path)
+	var err = DirAccess.rename_absolute(from_path, to_path)
 	if err != OK:
 		return "Error: Failed to move '%s' to '%s' (code %s)." % [from_path, to_path, str(err)]
 
@@ -381,16 +381,16 @@ func move_file(arguments: Dictionary) -> String:
 
 
 func copy_file(arguments: Dictionary) -> String:
-	var from_path := _normalize_path(str(arguments.get("from_path", "")))
-	var to_path := _normalize_path(str(arguments.get("to_path", "")))
+	var from_path = _normalize_path(str(arguments.get("from_path", "")))
+	var to_path = _normalize_path(str(arguments.get("to_path", "")))
 	if from_path == "" or to_path == "":
 		return "Error: 'from_path' and 'to_path' are required."
 
-	var ensure_err := _ensure_parent_dir(to_path)
+	var ensure_err = _ensure_parent_dir(to_path)
 	if ensure_err != OK:
 		return "Error: Failed to create parent directory for %s" % to_path
 
-	var err := DirAccess.copy_absolute(from_path, to_path)
+	var err = DirAccess.copy_absolute(from_path, to_path)
 	if err != OK:
 		return "Error: Failed to copy '%s' to '%s' (code %s)." % [from_path, to_path, str(err)]
 
@@ -399,10 +399,10 @@ func copy_file(arguments: Dictionary) -> String:
 
 
 func create_script(arguments: Dictionary) -> String:
-	var requested_path := str(arguments.get("path", ""))
-	var requested_language := str(arguments.get("language", "auto")).to_lower()
-	var resolved_language := _resolve_requested_script_language(requested_language, requested_path)
-	var path := _normalize_script_path(requested_path, resolved_language)
+	var requested_path = str(arguments.get("path", ""))
+	var requested_language = str(arguments.get("language", "auto")).to_lower()
+	var resolved_language = _resolve_requested_script_language(requested_language, requested_path)
+	var path = _normalize_script_path(requested_path, resolved_language)
 	if path == "":
 		return "Error: 'path' is required."
 	if resolved_language == "dotnet":
@@ -410,10 +410,10 @@ func create_script(arguments: Dictionary) -> String:
 		csharp_arguments["path"] = path
 		return create_csharp_script(csharp_arguments)
 
-	var extends_name := str(arguments.get("extends", "Node")).strip_edges()
-	var class_name := str(arguments.get("class_name", "")).strip_edges()
-	var body := str(arguments.get("body", "")).strip_edges()
-	var use_tool := bool(arguments.get("tool", false))
+	var extends_name = str(arguments.get("extends", "Node")).strip_edges()
+	var class_name = str(arguments.get("class_name", "")).strip_edges()
+	var body = str(arguments.get("body", "")).strip_edges()
+	var use_tool = bool(arguments.get("tool", false))
 
 	var lines: Array[String] = []
 	if use_tool:
@@ -428,7 +428,7 @@ func create_script(arguments: Dictionary) -> String:
 		lines.append("func _ready() -> void:")
 		lines.append("\tpass")
 
-	var result := write_file({
+	var result = write_file({
 		"path": path,
 		"content": "\n".join(lines) + "\n",
 	})
@@ -444,11 +444,11 @@ func create_script(arguments: Dictionary) -> String:
 
 
 func list_scripts(arguments: Dictionary) -> String:
-	var root_path := _normalize_path(str(arguments.get("path", "res://")))
-	var max_entries := clamp(int(arguments.get("max_entries", 300)), 1, 5000)
-	var recursive := bool(arguments.get("recursive", true))
-	var requested_language := str(arguments.get("language", "auto")).to_lower()
-	var resolved_language := _resolve_requested_script_language_set(requested_language)
+	var root_path = _normalize_path(str(arguments.get("path", "res://")))
+	var max_entries = clamp(int(arguments.get("max_entries", 300)), 1, 5000)
+	var recursive = bool(arguments.get("recursive", true))
+	var requested_language = str(arguments.get("language", "auto")).to_lower()
+	var resolved_language = _resolve_requested_script_language_set(requested_language)
 	var scripts: Array = []
 
 	if resolved_language == "gdscript" or resolved_language == "mixed":
@@ -474,21 +474,21 @@ func list_scripts(arguments: Dictionary) -> String:
 
 
 func create_csharp_script(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 	if not path.to_lower().ends_with(".cs"):
 		return "Error: C# script path must end with .cs"
 
-	var class_name := str(arguments.get("class_name", "")).strip_edges()
+	var class_name = str(arguments.get("class_name", "")).strip_edges()
 	if class_name == "":
 		class_name = _pascal_case(path.get_file().trim_suffix(".cs"))
 
-	var namespace_name := str(arguments.get("namespace", "")).strip_edges()
-	var base_class := str(arguments.get("extends", "Node")).strip_edges()
-	var body := str(arguments.get("body", "")).strip_edges()
-	var use_tool := bool(arguments.get("tool", false))
-	var use_partial := bool(arguments.get("partial", true))
+	var namespace_name = str(arguments.get("namespace", "")).strip_edges()
+	var base_class = str(arguments.get("extends", "Node")).strip_edges()
+	var body = str(arguments.get("body", "")).strip_edges()
+	var use_tool = bool(arguments.get("tool", false))
+	var use_partial = bool(arguments.get("partial", true))
 
 	var lines: Array[String] = []
 	lines.append("using Godot;")
@@ -500,7 +500,7 @@ func create_csharp_script(arguments: Dictionary) -> String:
 		lines.append("")
 	if use_tool:
 		lines.append("[Tool]")
-	var partial_text := " partial" if use_partial else ""
+	var partial_text = " partial" if use_partial else ""
 	lines.append("public%s class %s : %s" % [partial_text, class_name, base_class])
 	lines.append("{")
 	if body != "":
@@ -512,7 +512,7 @@ func create_csharp_script(arguments: Dictionary) -> String:
 		lines.append("\t}")
 	lines.append("}")
 
-	var result := write_file({
+	var result = write_file({
 		"path": path,
 		"content": "\n".join(lines) + "\n",
 	})
@@ -528,9 +528,9 @@ func create_csharp_script(arguments: Dictionary) -> String:
 
 
 func list_csharp_scripts(arguments: Dictionary) -> String:
-	var root_path := _normalize_path(str(arguments.get("path", "res://")))
-	var max_entries := clamp(int(arguments.get("max_entries", 300)), 1, 5000)
-	var recursive := bool(arguments.get("recursive", true))
+	var root_path = _normalize_path(str(arguments.get("path", "res://")))
+	var max_entries = clamp(int(arguments.get("max_entries", 300)), 1, 5000)
+	var recursive = bool(arguments.get("recursive", true))
 	var script_paths: Array = []
 	_collect_matching_files(root_path, recursive, max_entries, script_paths, [".cs"])
 	script_paths = _exclude_internal_plugin_paths(script_paths)
@@ -542,7 +542,7 @@ func list_csharp_scripts(arguments: Dictionary) -> String:
 
 
 func get_dotnet_project_info(_arguments: Dictionary) -> String:
-	var project_root := ProjectSettings.globalize_path("res://")
+	var project_root = ProjectSettings.globalize_path("res://")
 	var csproj_files: Array = []
 	var sln_files: Array = []
 	_collect_matching_files(project_root, false, 200, csproj_files, [".csproj"])
@@ -566,21 +566,21 @@ func edit_script(arguments: Dictionary) -> String:
 
 
 func patch_script(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 	if not FileAccess.file_exists(path):
 		return "Error: File not found: %s" % path
 
-	var file := FileAccess.open(path, FileAccess.READ)
+	var file = FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return "Error: Failed to open file: %s" % path
 
-	var content := file.get_as_text()
-	var find_text := str(arguments.get("find", ""))
-	var replace_text := str(arguments.get("replace", ""))
-	var prepend_text := str(arguments.get("prepend", ""))
-	var append_text := str(arguments.get("append", ""))
+	var content = file.get_as_text()
+	var find_text = str(arguments.get("find", ""))
+	var replace_text = str(arguments.get("replace", ""))
+	var prepend_text = str(arguments.get("prepend", ""))
+	var append_text = str(arguments.get("append", ""))
 
 	if find_text != "":
 		if not content.contains(find_text):
@@ -598,7 +598,7 @@ func patch_script(arguments: Dictionary) -> String:
 
 
 func open_script(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 
@@ -611,7 +611,7 @@ func open_script(arguments: Dictionary) -> String:
 
 
 func get_play_state(_arguments: Dictionary) -> String:
-	var editor := _editor()
+	var editor = _editor()
 	return _render_variant({
 		"is_playing_scene": editor.is_playing_scene(),
 		"current_scene_path": editor.get_current_path(),
@@ -621,8 +621,8 @@ func get_play_state(_arguments: Dictionary) -> String:
 
 
 func enter_play_mode(arguments: Dictionary) -> String:
-	var mode := str(arguments.get("mode", "current")).to_lower()
-	var editor := _editor()
+	var mode = str(arguments.get("mode", "current")).to_lower()
+	var editor = _editor()
 
 	match mode:
 		"current":
@@ -630,7 +630,7 @@ func enter_play_mode(arguments: Dictionary) -> String:
 		"main":
 			editor.play_main_scene()
 		"custom":
-			var scene_path := _normalize_path(str(arguments.get("scene_path", "")))
+			var scene_path = _normalize_path(str(arguments.get("scene_path", "")))
 			if scene_path == "":
 				return "Error: 'scene_path' is required when mode is 'custom'."
 			editor.play_custom_scene(scene_path)
@@ -651,20 +651,20 @@ func exit_play_mode(_arguments: Dictionary) -> String:
 
 
 func simulate_action(arguments: Dictionary) -> String:
-	var action_name := str(arguments.get("action", "")).strip_edges()
+	var action_name = str(arguments.get("action", "")).strip_edges()
 	if action_name == "":
 		return "Error: 'action' is required."
 
-	var mode := str(arguments.get("mode", "tap")).to_lower()
-	var strength := float(arguments.get("strength", 1.0))
+	var mode = str(arguments.get("mode", "tap")).to_lower()
+	var strength = float(arguments.get("strength", 1.0))
 	if mode == "press" or mode == "tap":
-		var press_event := InputEventAction.new()
+		var press_event = InputEventAction.new()
 		press_event.action = action_name
 		press_event.pressed = true
 		press_event.strength = strength
 		Input.parse_input_event(press_event)
 	if mode == "release" or mode == "tap":
-		var release_event := InputEventAction.new()
+		var release_event = InputEventAction.new()
 		release_event.action = action_name
 		release_event.pressed = false
 		release_event.strength = 0.0
@@ -678,14 +678,14 @@ func simulate_action(arguments: Dictionary) -> String:
 
 
 func simulate_key_event(arguments: Dictionary) -> String:
-	var mode := str(arguments.get("mode", "tap")).to_lower()
-	var keycode := _to_keycode(arguments.get("key"))
-	var physical_keycode := _to_keycode(arguments.get("physical_key"))
+	var mode = str(arguments.get("mode", "tap")).to_lower()
+	var keycode = _to_keycode(arguments.get("key"))
+	var physical_keycode = _to_keycode(arguments.get("physical_key"))
 	if keycode == 0 and physical_keycode == 0:
 		return "Error: 'key' or 'physical_key' is required."
 
 	if mode == "press" or mode == "tap":
-		var press_event := InputEventKey.new()
+		var press_event = InputEventKey.new()
 		press_event.pressed = true
 		if keycode != 0:
 			press_event.keycode = keycode
@@ -693,7 +693,7 @@ func simulate_key_event(arguments: Dictionary) -> String:
 			press_event.physical_keycode = physical_keycode
 		Input.parse_input_event(press_event)
 	if mode == "release" or mode == "tap":
-		var release_event := InputEventKey.new()
+		var release_event = InputEventKey.new()
 		release_event.pressed = false
 		if keycode != 0:
 			release_event.keycode = keycode
@@ -709,18 +709,18 @@ func simulate_key_event(arguments: Dictionary) -> String:
 
 
 func simulate_mouse_button(arguments: Dictionary) -> String:
-	var mode := str(arguments.get("mode", "tap")).to_lower()
-	var button_index := _to_mouse_button(arguments.get("button", "left"))
-	var position := _to_vector2(arguments.get("position", Vector2.ZERO))
+	var mode = str(arguments.get("mode", "tap")).to_lower()
+	var button_index = _to_mouse_button(arguments.get("button", "left"))
+	var position = _to_vector2(arguments.get("position", Vector2.ZERO))
 
 	if mode == "press" or mode == "tap":
-		var press_event := InputEventMouseButton.new()
+		var press_event = InputEventMouseButton.new()
 		press_event.button_index = button_index
 		press_event.position = position
 		press_event.pressed = true
 		Input.parse_input_event(press_event)
 	if mode == "release" or mode == "tap":
-		var release_event := InputEventMouseButton.new()
+		var release_event = InputEventMouseButton.new()
 		release_event.button_index = button_index
 		release_event.position = position
 		release_event.pressed = false
@@ -734,23 +734,23 @@ func simulate_mouse_button(arguments: Dictionary) -> String:
 
 
 func simulate_mouse_drag(arguments: Dictionary) -> String:
-	var from_position := _to_vector2(arguments.get("from_position", Vector2.ZERO))
-	var to_position := _to_vector2(arguments.get("to_position", Vector2.ZERO))
-	var steps := clamp(int(arguments.get("steps", 8)), 1, 240)
-	var button_index := _to_mouse_button(arguments.get("button", "left"))
+	var from_position = _to_vector2(arguments.get("from_position", Vector2.ZERO))
+	var to_position = _to_vector2(arguments.get("to_position", Vector2.ZERO))
+	var steps = clamp(int(arguments.get("steps", 8)), 1, 240)
+	var button_index = _to_mouse_button(arguments.get("button", "left"))
 
-	var press_event := InputEventMouseButton.new()
+	var press_event = InputEventMouseButton.new()
 	press_event.button_index = button_index
 	press_event.position = from_position
 	press_event.global_position = from_position
 	press_event.pressed = true
 	Input.parse_input_event(press_event)
 
-	var previous := from_position
+	var previous = from_position
 	for step_index in range(1, steps + 1):
-		var weight := float(step_index) / float(steps)
-		var current := from_position.lerp(to_position, weight)
-		var motion_event := InputEventMouseMotion.new()
+		var weight = float(step_index) / float(steps)
+		var current = from_position.lerp(to_position, weight)
+		var motion_event = InputEventMouseMotion.new()
 		motion_event.position = current
 		motion_event.global_position = current
 		motion_event.relative = current - previous
@@ -759,7 +759,7 @@ func simulate_mouse_drag(arguments: Dictionary) -> String:
 		Input.parse_input_event(motion_event)
 		previous = current
 
-	var release_event := InputEventMouseButton.new()
+	var release_event = InputEventMouseButton.new()
 	release_event.button_index = button_index
 	release_event.position = to_position
 	release_event.global_position = to_position
@@ -785,8 +785,8 @@ func simulate_input_sequence(arguments: Dictionary) -> String:
 			results.append("Error: Sequence item must be an object.")
 			continue
 
-		var event_type := str(item.get("type", "")).strip_edges()
-		var result_text := ""
+		var event_type = str(item.get("type", "")).strip_edges()
+		var result_text = ""
 		match event_type:
 			"action":
 				result_text = simulate_action(item)
@@ -816,25 +816,25 @@ func get_time_scale(_arguments: Dictionary) -> String:
 
 
 func get_console_logs(arguments: Dictionary) -> String:
-	var max_lines := clamp(int(arguments.get("max_lines", 200)), 10, 4000)
-	var include_rotated := bool(arguments.get("include_rotated", true))
-	var filter_text := str(arguments.get("filter", "")).strip_edges()
-	var severity := str(arguments.get("severity", "all")).to_lower()
-	var log_files := _get_log_files(include_rotated)
+	var max_lines = clamp(int(arguments.get("max_lines", 200)), 10, 4000)
+	var include_rotated = bool(arguments.get("include_rotated", true))
+	var filter_text = str(arguments.get("filter", "")).strip_edges()
+	var severity = str(arguments.get("severity", "all")).to_lower()
+	var log_files = _get_log_files(include_rotated)
 	if log_files.is_empty():
 		return "Error: No log files found. File logging may be disabled."
 
-	var selected_file := log_files[-1]
-	var file_text := FileAccess.get_file_as_string(selected_file)
-	var lines := file_text.split("\n")
+	var selected_file = log_files[-1]
+	var file_text = FileAccess.get_file_as_string(selected_file)
+	var lines = file_text.split("\n")
 	var filtered_lines: Array[String] = []
 	for line in lines:
 		if not _matches_log_filters(line, severity, filter_text):
 			continue
 		filtered_lines.append(line)
 
-	var start_index := max(filtered_lines.size() - max_lines, 0)
-	var tail := filtered_lines.slice(start_index)
+	var start_index = max(filtered_lines.size() - max_lines, 0)
+	var tail = filtered_lines.slice(start_index)
 	return _render_variant({
 		"log_path": selected_file,
 		"available_logs": log_files,
@@ -853,7 +853,7 @@ func set_time_scale(arguments: Dictionary) -> String:
 
 
 func get_performance_snapshot(_arguments: Dictionary) -> String:
-	var editor := _editor()
+	var editor = _editor()
 	var scene_root = editor.get_edited_scene_root()
 	var viewport_2d = editor.get_editor_viewport_2d()
 	var viewport_3d = editor.get_editor_viewport_3d(0)
@@ -875,7 +875,7 @@ func analyze_scene_complexity(_arguments: Dictionary) -> String:
 	if scene_root == null:
 		return "Error: No scene is currently open in the editor."
 
-	var stats := {
+	var stats = {
 		"total_nodes": 0,
 		"max_depth": 0,
 		"node_2d_count": 0,
@@ -891,7 +891,7 @@ func analyze_scene_complexity(_arguments: Dictionary) -> String:
 	}
 	_analyze_node_recursive(scene_root, 0, stats)
 
-	var unique_class_count := stats["unique_classes"].size()
+	var unique_class_count = stats["unique_classes"].size()
 	stats.erase("unique_classes")
 	stats["unique_class_count"] = unique_class_count
 	stats["complexity_score"] = int(
@@ -906,7 +906,7 @@ func analyze_scene_complexity(_arguments: Dictionary) -> String:
 
 
 func capture_editor_view(arguments: Dictionary) -> String:
-	var view := str(arguments.get("view", "2d")).to_lower()
+	var view = str(arguments.get("view", "2d")).to_lower()
 	var viewport = null
 	if view == "3d":
 		viewport = _editor().get_editor_viewport_3d(int(arguments.get("index", 0)))
@@ -924,17 +924,17 @@ func capture_editor_view(arguments: Dictionary) -> String:
 	if image == null:
 		return "Error: Failed to capture viewport image."
 
-	var save_path := _normalize_path(str(arguments.get("save_path", "user://funplay_mcp_capture_%s.png" % view)))
+	var save_path = _normalize_path(str(arguments.get("save_path", "user://funplay_mcp_capture_%s.png" % view)))
 	if bool(arguments.get("save_to_file", false)):
-		var ensure_err := _ensure_parent_dir(save_path)
+		var ensure_err = _ensure_parent_dir(save_path)
 		if ensure_err != OK:
 			return "Error: Failed to create parent directory for %s" % save_path
-		var save_err := image.save_png(save_path)
+		var save_err = image.save_png(save_path)
 		if save_err != OK:
 			return "Error: Failed to save screenshot to %s (code %s)." % [save_path, str(save_err)]
 
 	if bool(arguments.get("return_data_uri", true)):
-		var png_bytes := image.save_png_to_buffer()
+		var png_bytes = image.save_png_to_buffer()
 		return "data:image/png;base64,%s" % Marshalls.raw_to_base64(png_bytes)
 
 	return _render_variant({
@@ -945,7 +945,7 @@ func capture_editor_view(arguments: Dictionary) -> String:
 
 
 func get_node_info(arguments: Dictionary) -> String:
-	var node_path := str(arguments.get("node_path", "")).strip_edges()
+	var node_path = str(arguments.get("node_path", "")).strip_edges()
 	if node_path == "":
 		return "Error: 'node_path' is required."
 
@@ -961,10 +961,10 @@ func find_nodes(arguments: Dictionary) -> String:
 	if scene_root == null:
 		return "Error: No scene is currently open in the editor."
 
-	var name_contains := str(arguments.get("name_contains", "")).to_lower()
-	var class_name := str(arguments.get("class_name", "")).strip_edges()
-	var script_path := _normalize_path(str(arguments.get("script_path", "")))
-	var max_results := clamp(int(arguments.get("max_results", 100)), 1, 2000)
+	var name_contains = str(arguments.get("name_contains", "")).to_lower()
+	var class_name = str(arguments.get("class_name", "")).strip_edges()
+	var script_path = _normalize_path(str(arguments.get("script_path", "")))
+	var max_results = clamp(int(arguments.get("max_results", 100)), 1, 2000)
 	var results: Array = []
 
 	_find_nodes_recursive(scene_root, name_contains, class_name, script_path, max_results, results)
@@ -975,7 +975,7 @@ func find_nodes(arguments: Dictionary) -> String:
 
 
 func select_node(arguments: Dictionary) -> String:
-	var node_path := str(arguments.get("node_path", "")).strip_edges()
+	var node_path = str(arguments.get("node_path", "")).strip_edges()
 	if node_path == "":
 		return "Error: 'node_path' is required."
 
@@ -993,7 +993,7 @@ func select_node(arguments: Dictionary) -> String:
 
 
 func select_file(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 
@@ -1002,7 +1002,7 @@ func select_file(arguments: Dictionary) -> String:
 
 
 func create_node(arguments: Dictionary) -> String:
-	var node_type := str(arguments.get("node_type", "")).strip_edges()
+	var node_type = str(arguments.get("node_type", "")).strip_edges()
 	if node_type == "":
 		return "Error: 'node_type' is required."
 
@@ -1028,7 +1028,7 @@ func create_node(arguments: Dictionary) -> String:
 	_assign_owner_recursive(node, scene_root)
 
 	if arguments.has("script_path"):
-		var set_script_result := set_node_script({
+		var set_script_result = set_node_script({
 			"node_path": str(node.get_path()),
 			"script_path": arguments.get("script_path"),
 		})
@@ -1049,7 +1049,7 @@ func create_node(arguments: Dictionary) -> String:
 
 
 func instantiate_scene(arguments: Dictionary) -> String:
-	var scene_path := _normalize_path(str(arguments.get("scene_path", "")))
+	var scene_path = _normalize_path(str(arguments.get("scene_path", "")))
 	if scene_path == "":
 		return "Error: 'scene_path' is required."
 
@@ -1088,7 +1088,7 @@ func instantiate_scene(arguments: Dictionary) -> String:
 
 
 func duplicate_node(arguments: Dictionary) -> String:
-	var node_path := str(arguments.get("node_path", "")).strip_edges()
+	var node_path = str(arguments.get("node_path", "")).strip_edges()
 	if node_path == "":
 		return "Error: 'node_path' is required."
 
@@ -1122,8 +1122,8 @@ func duplicate_node(arguments: Dictionary) -> String:
 
 
 func rename_node(arguments: Dictionary) -> String:
-	var node_path := str(arguments.get("node_path", "")).strip_edges()
-	var new_name := str(arguments.get("new_name", "")).strip_edges()
+	var node_path = str(arguments.get("node_path", "")).strip_edges()
+	var new_name = str(arguments.get("new_name", "")).strip_edges()
 	if node_path == "" or new_name == "":
 		return "Error: 'node_path' and 'new_name' are required."
 
@@ -1138,8 +1138,8 @@ func rename_node(arguments: Dictionary) -> String:
 
 
 func reparent_node(arguments: Dictionary) -> String:
-	var node_path := str(arguments.get("node_path", "")).strip_edges()
-	var new_parent_path := str(arguments.get("new_parent_path", "")).strip_edges()
+	var node_path = str(arguments.get("node_path", "")).strip_edges()
+	var new_parent_path = str(arguments.get("new_parent_path", "")).strip_edges()
 	if node_path == "" or new_parent_path == "":
 		return "Error: 'node_path' and 'new_parent_path' are required."
 
@@ -1152,7 +1152,7 @@ func reparent_node(arguments: Dictionary) -> String:
 	if node == _editor().get_edited_scene_root():
 		return "Error: Reparenting the edited scene root is not supported."
 
-	var keep_global := bool(arguments.get("keep_global_transform", false))
+	var keep_global = bool(arguments.get("keep_global_transform", false))
 	var stored_transform = null
 	if keep_global:
 		stored_transform = _capture_global_transform(node)
@@ -1173,8 +1173,8 @@ func reparent_node(arguments: Dictionary) -> String:
 
 
 func set_node_property(arguments: Dictionary) -> String:
-	var node_path := str(arguments.get("node_path", "")).strip_edges()
-	var property_name := str(arguments.get("property", "")).strip_edges()
+	var node_path = str(arguments.get("node_path", "")).strip_edges()
+	var property_name = str(arguments.get("property", "")).strip_edges()
 	if node_path == "" or property_name == "":
 		return "Error: 'node_path' and 'property' are required."
 
@@ -1191,7 +1191,7 @@ func set_node_property(arguments: Dictionary) -> String:
 
 
 func set_node_properties(arguments: Dictionary) -> String:
-	var node_path := str(arguments.get("node_path", "")).strip_edges()
+	var node_path = str(arguments.get("node_path", "")).strip_edges()
 	var properties = arguments.get("properties", {})
 	if node_path == "":
 		return "Error: 'node_path' is required."
@@ -1212,7 +1212,7 @@ func set_node_properties(arguments: Dictionary) -> String:
 
 
 func set_transform_2d(arguments: Dictionary) -> String:
-	var node_path := str(arguments.get("node_path", "")).strip_edges()
+	var node_path = str(arguments.get("node_path", "")).strip_edges()
 	if node_path == "":
 		return "Error: 'node_path' is required."
 
@@ -1245,7 +1245,7 @@ func set_transform_2d(arguments: Dictionary) -> String:
 
 
 func set_transform_3d(arguments: Dictionary) -> String:
-	var node_path := str(arguments.get("node_path", "")).strip_edges()
+	var node_path = str(arguments.get("node_path", "")).strip_edges()
 	if node_path == "":
 		return "Error: 'node_path' is required."
 
@@ -1268,7 +1268,7 @@ func set_transform_3d(arguments: Dictionary) -> String:
 
 
 func remove_node(arguments: Dictionary) -> String:
-	var node_path := str(arguments.get("node_path", "")).strip_edges()
+	var node_path = str(arguments.get("node_path", "")).strip_edges()
 	if node_path == "":
 		return "Error: 'node_path' is required."
 
@@ -1287,8 +1287,8 @@ func remove_node(arguments: Dictionary) -> String:
 
 
 func set_node_script(arguments: Dictionary) -> String:
-	var node_path := str(arguments.get("node_path", "")).strip_edges()
-	var script_path := _normalize_path(str(arguments.get("script_path", "")))
+	var node_path = str(arguments.get("node_path", "")).strip_edges()
+	var script_path = _normalize_path(str(arguments.get("script_path", "")))
 	if node_path == "" or script_path == "":
 		return "Error: 'node_path' and 'script_path' are required."
 
@@ -1308,11 +1308,11 @@ func set_node_script(arguments: Dictionary) -> String:
 
 
 func create_material(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 
-	var material_type := str(arguments.get("material_type", "StandardMaterial3D")).strip_edges()
+	var material_type = str(arguments.get("material_type", "StandardMaterial3D")).strip_edges()
 	if not ClassDB.class_exists(material_type):
 		return "Error: Unknown material type '%s'." % material_type
 
@@ -1325,11 +1325,11 @@ func create_material(arguments: Dictionary) -> String:
 		for key in properties.keys():
 			material.set(str(key), properties[key])
 
-	var ensure_err := _ensure_parent_dir(path)
+	var ensure_err = _ensure_parent_dir(path)
 	if ensure_err != OK:
 		return "Error: Failed to create parent directory for %s" % path
 
-	var save_err := ResourceSaver.save(material, path, ResourceSaver.FLAG_CHANGE_PATH)
+	var save_err = ResourceSaver.save(material, path, ResourceSaver.FLAG_CHANGE_PATH)
 	if save_err != OK:
 		return "Error: Failed to save material to %s (code %s)." % [path, str(save_err)]
 
@@ -1341,8 +1341,8 @@ func create_material(arguments: Dictionary) -> String:
 
 
 func assign_material(arguments: Dictionary) -> String:
-	var target_path := str(arguments.get("target_path", "")).strip_edges()
-	var material_path := _normalize_path(str(arguments.get("material_path", "")))
+	var target_path = str(arguments.get("target_path", "")).strip_edges()
+	var material_path = _normalize_path(str(arguments.get("material_path", "")))
 	if target_path == "" or material_path == "":
 		return "Error: 'target_path' and 'material_path' are required."
 
@@ -1354,7 +1354,7 @@ func assign_material(arguments: Dictionary) -> String:
 	if material == null or not (material is Material):
 		return "Error: Material not found or invalid: %s" % material_path
 
-	var surface_index := int(arguments.get("surface_index", -1))
+	var surface_index = int(arguments.get("surface_index", -1))
 	if node is CanvasItem:
 		node.material = material
 	elif node is GeometryInstance3D:
@@ -1379,7 +1379,7 @@ func create_ui_root(arguments: Dictionary) -> String:
 	if scene_root == null:
 		return "Error: No edited scene is open."
 
-	var kind := str(arguments.get("kind", "canvas_layer")).to_lower()
+	var kind = str(arguments.get("kind", "canvas_layer")).to_lower()
 	var parent = _resolve_node_path(str(arguments.get("parent_path", "")))
 	if parent == null:
 		parent = scene_root
@@ -1389,20 +1389,20 @@ func create_ui_root(arguments: Dictionary) -> String:
 
 	match kind:
 		"canvas_layer":
-			var canvas_layer := CanvasLayer.new()
+			var canvas_layer = CanvasLayer.new()
 			canvas_layer.name = _safe_name(str(arguments.get("name", "UI")), "UI")
 			parent.add_child(canvas_layer)
 			_assign_owner_recursive(canvas_layer, scene_root)
 			created_root = canvas_layer
 
-			var control_root := Control.new()
+			var control_root = Control.new()
 			control_root.name = _safe_name(str(arguments.get("control_name", "Root")), "Root")
 			canvas_layer.add_child(control_root)
 			_assign_owner_recursive(control_root, scene_root)
 			_apply_layout_preset(control_root, "full_rect")
 			primary_control = control_root
 		"control":
-			var control := Control.new()
+			var control = Control.new()
 			control.name = _safe_name(str(arguments.get("name", "UIRoot")), "UIRoot")
 			parent.add_child(control)
 			_assign_owner_recursive(control, scene_root)
@@ -1422,38 +1422,38 @@ func create_ui_root(arguments: Dictionary) -> String:
 
 
 func create_control(arguments: Dictionary) -> String:
-	var control_type := str(arguments.get("control_type", "")).strip_edges()
+	var control_type = str(arguments.get("control_type", "")).strip_edges()
 	if control_type == "":
 		return "Error: 'control_type' is required."
 	return _create_control_internal(control_type, arguments)
 
 
 func create_label(arguments: Dictionary) -> String:
-	var merged := arguments.duplicate(true)
+	var merged = arguments.duplicate(true)
 	merged["control_type"] = "Label"
 	return _create_control_internal("Label", merged)
 
 
 func create_button(arguments: Dictionary) -> String:
-	var merged := arguments.duplicate(true)
+	var merged = arguments.duplicate(true)
 	merged["control_type"] = "Button"
 	return _create_control_internal("Button", merged)
 
 
 func create_panel(arguments: Dictionary) -> String:
-	var merged := arguments.duplicate(true)
+	var merged = arguments.duplicate(true)
 	merged["control_type"] = "Panel"
 	return _create_control_internal("Panel", merged)
 
 
 func create_texture_rect(arguments: Dictionary) -> String:
-	var merged := arguments.duplicate(true)
+	var merged = arguments.duplicate(true)
 	merged["control_type"] = "TextureRect"
 	return _create_control_internal("TextureRect", merged)
 
 
 func create_container(arguments: Dictionary) -> String:
-	var container_type := str(arguments.get("container_type", "")).strip_edges()
+	var container_type = str(arguments.get("container_type", "")).strip_edges()
 	if container_type == "":
 		return "Error: 'container_type' is required."
 	return _create_control_internal(container_type, arguments)
@@ -1516,8 +1516,8 @@ func set_control_text(arguments: Dictionary) -> String:
 	if control == null:
 		return "Error: Control not found."
 
-	var text := str(arguments.get("text", ""))
-	var property_name := str(arguments.get("property", "text")).strip_edges()
+	var text = str(arguments.get("text", ""))
+	var property_name = str(arguments.get("property", "text")).strip_edges()
 	if property_name == "":
 		property_name = "text"
 
@@ -1537,8 +1537,8 @@ func set_control_theme_override(arguments: Dictionary) -> String:
 	if control == null:
 		return "Error: Control not found."
 
-	var override_type := str(arguments.get("override_type", "")).to_lower()
-	var name := str(arguments.get("name", "")).strip_edges()
+	var override_type = str(arguments.get("override_type", "")).to_lower()
+	var name = str(arguments.get("name", "")).strip_edges()
 	if override_type == "" or name == "":
 		return "Error: 'override_type' and 'name' are required."
 
@@ -1550,13 +1550,13 @@ func set_control_theme_override(arguments: Dictionary) -> String:
 		"font_size":
 			control.add_theme_font_size_override(name, int(arguments.get("value", 0)))
 		"font":
-			var font_path := _normalize_path(str(arguments.get("resource_path", "")))
+			var font_path = _normalize_path(str(arguments.get("resource_path", "")))
 			var font = load(font_path)
 			if font == null:
 				return "Error: Font resource not found: %s" % font_path
 			control.add_theme_font_override(name, font)
 		"stylebox":
-			var style_path := _normalize_path(str(arguments.get("resource_path", "")))
+			var style_path = _normalize_path(str(arguments.get("resource_path", "")))
 			var stylebox = load(style_path)
 			if stylebox == null:
 				return "Error: StyleBox resource not found: %s" % style_path
@@ -1576,7 +1576,7 @@ func set_control_texture(arguments: Dictionary) -> String:
 	if control == null:
 		return "Error: Control not found."
 
-	var texture_path := _normalize_path(str(arguments.get("texture_path", "")))
+	var texture_path = _normalize_path(str(arguments.get("texture_path", "")))
 	if texture_path == "":
 		return "Error: 'texture_path' is required."
 	var texture = load(texture_path)
@@ -1603,8 +1603,8 @@ func set_control_texture(arguments: Dictionary) -> String:
 func connect_node_signal(arguments: Dictionary) -> String:
 	var source_node = _resolve_node_path(str(arguments.get("source_path", "")).strip_edges())
 	var target_node = _resolve_node_path(str(arguments.get("target_path", "")).strip_edges())
-	var signal_name := str(arguments.get("signal_name", "")).strip_edges()
-	var method_name := str(arguments.get("method_name", "")).strip_edges()
+	var signal_name = str(arguments.get("signal_name", "")).strip_edges()
+	var method_name = str(arguments.get("method_name", "")).strip_edges()
 
 	if source_node == null or target_node == null:
 		return "Error: Source or target node not found."
@@ -1615,11 +1615,11 @@ func connect_node_signal(arguments: Dictionary) -> String:
 	if not target_node.has_method(method_name):
 		return "Error: Target node does not have method '%s'." % method_name
 
-	var callable := Callable(target_node, method_name)
+	var callable = Callable(target_node, method_name)
 	if source_node.is_connected(signal_name, callable):
 		return "Signal already connected."
 
-	var err := source_node.connect(signal_name, callable, int(arguments.get("flags", 0)))
+	var err = source_node.connect(signal_name, callable, int(arguments.get("flags", 0)))
 	if err != OK:
 		return "Error: Failed to connect signal '%s' (code %s)." % [signal_name, str(err)]
 
@@ -1640,7 +1640,7 @@ func create_animation_player(arguments: Dictionary) -> String:
 	if parent == null:
 		parent = scene_root
 
-	var player := AnimationPlayer.new()
+	var player = AnimationPlayer.new()
 	player.name = _safe_name(str(arguments.get("name", "AnimationPlayer")), "AnimationPlayer")
 	parent.add_child(player)
 	_assign_owner_recursive(player, scene_root)
@@ -1662,17 +1662,17 @@ func create_animation_clip(arguments: Dictionary) -> String:
 	if player == null:
 		return "Error: AnimationPlayer not found."
 
-	var animation_name := str(arguments.get("animation_name", "")).strip_edges()
+	var animation_name = str(arguments.get("animation_name", "")).strip_edges()
 	if animation_name == "":
 		return "Error: 'animation_name' is required."
 
-	var library_name := str(arguments.get("library_name", "")).strip_edges()
-	var animation := Animation.new()
+	var library_name = str(arguments.get("library_name", "")).strip_edges()
+	var animation = Animation.new()
 	animation.length = float(arguments.get("length", 1.0))
 	animation.loop_mode = int(arguments.get("loop_mode", Animation.LOOP_NONE))
 	animation.step = float(arguments.get("step", 0.1))
 
-	var library := _get_or_create_animation_library(player, library_name)
+	var library = _get_or_create_animation_library(player, library_name)
 	if library.has_animation(animation_name):
 		library.remove_animation(animation_name)
 	library.add_animation(animation_name, animation)
@@ -1694,18 +1694,18 @@ func add_animation_track(arguments: Dictionary) -> String:
 	if player == null:
 		return "Error: AnimationPlayer not found."
 
-	var animation_name := str(arguments.get("animation_name", "")).strip_edges()
+	var animation_name = str(arguments.get("animation_name", "")).strip_edges()
 	if animation_name == "":
 		return "Error: 'animation_name' is required."
 
-	var library_name := str(arguments.get("library_name", "")).strip_edges()
-	var library := _get_or_create_animation_library(player, library_name)
+	var library_name = str(arguments.get("library_name", "")).strip_edges()
+	var library = _get_or_create_animation_library(player, library_name)
 	var animation = library.get_animation(animation_name)
 	if animation == null:
 		return "Error: Animation '%s' not found." % animation_name
 
-	var track_type := _animation_track_type(str(arguments.get("track_type", "value")))
-	var track_index := animation.add_track(track_type)
+	var track_type = _animation_track_type(str(arguments.get("track_type", "value")))
+	var track_index = animation.add_track(track_type)
 	animation.track_set_path(track_index, NodePath(str(arguments.get("path", ""))))
 	if arguments.has("interpolation_type"):
 		animation.track_set_interpolation_type(track_index, int(arguments.get("interpolation_type")))
@@ -1766,7 +1766,7 @@ func play_animation(arguments: Dictionary) -> String:
 	if player == null:
 		return "Error: AnimationPlayer not found."
 
-	var animation_name := str(arguments.get("animation_name", "")).strip_edges()
+	var animation_name = str(arguments.get("animation_name", "")).strip_edges()
 	if animation_name == "":
 		return "Error: 'animation_name' is required."
 
@@ -1776,22 +1776,22 @@ func play_animation(arguments: Dictionary) -> String:
 
 func create_packed_scene_from_node(arguments: Dictionary) -> String:
 	var node = _resolve_node_path(str(arguments.get("node_path", "")))
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if node == null:
 		return "Error: Node not found."
 	if path == "":
 		return "Error: 'path' is required."
 
-	var packed := PackedScene.new()
-	var pack_err := packed.pack(node)
+	var packed = PackedScene.new()
+	var pack_err = packed.pack(node)
 	if pack_err != OK:
 		return "Error: Failed to pack node (code %s)." % str(pack_err)
 
-	var ensure_err := _ensure_parent_dir(path)
+	var ensure_err = _ensure_parent_dir(path)
 	if ensure_err != OK:
 		return "Error: Failed to create parent directory for %s" % path
 
-	var save_err := ResourceSaver.save(packed, path, ResourceSaver.FLAG_CHANGE_PATH)
+	var save_err = ResourceSaver.save(packed, path, ResourceSaver.FLAG_CHANGE_PATH)
 	if save_err != OK:
 		return "Error: Failed to save PackedScene to %s (code %s)." % [path, str(save_err)]
 
@@ -1805,7 +1805,7 @@ func create_packed_scene_from_node(arguments: Dictionary) -> String:
 
 
 func get_packed_scene_info(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 
@@ -1817,7 +1817,7 @@ func get_packed_scene_info(arguments: Dictionary) -> String:
 	if instance == null:
 		return "Error: Failed to instantiate PackedScene for inspection: %s" % path
 
-	var info := {
+	var info = {
 		"path": path,
 		"root": _node_to_summary(instance),
 		"node_count": _count_nodes(instance),
@@ -1892,10 +1892,10 @@ func list_node_properties(arguments: Dictionary) -> String:
 	if node == null:
 		return "Error: Node not found."
 
-	var include_usage := bool(arguments.get("include_usage", false))
+	var include_usage = bool(arguments.get("include_usage", false))
 	var properties: Array = []
 	for property_info in node.get_property_list():
-		var item := {
+		var item = {
 			"name": str(property_info.get("name", "")),
 			"type": int(property_info.get("type", TYPE_NIL)),
 			"class_name": str(property_info.get("class_name", "")),
@@ -1937,10 +1937,10 @@ func list_node_methods(arguments: Dictionary) -> String:
 	if node == null:
 		return "Error: Node not found."
 
-	var include_private := bool(arguments.get("include_private", false))
+	var include_private = bool(arguments.get("include_private", false))
 	var methods: Array = []
 	for method_info in node.get_method_list():
-		var method_name := str(method_info.get("name", ""))
+		var method_name = str(method_info.get("name", ""))
 		if not include_private and method_name.begins_with("_"):
 			continue
 		methods.append({
@@ -1958,14 +1958,14 @@ func list_node_methods(arguments: Dictionary) -> String:
 
 
 func list_addons(_arguments: Dictionary) -> String:
-	var addons_dir := "res://addons"
+	var addons_dir = "res://addons"
 	var addons: Array = []
 	if DirAccess.open(addons_dir) == null:
 		return _render_variant({"addons": addons})
 
 	for addon_name in DirAccess.get_directories_at(addons_dir):
-		var plugin_cfg_path := addons_dir.path_join(addon_name).path_join("plugin.cfg")
-		var info := {
+		var plugin_cfg_path = addons_dir.path_join(addon_name).path_join("plugin.cfg")
+		var info = {
 			"name": addon_name,
 			"path": addons_dir.path_join(addon_name),
 			"has_plugin_cfg": FileAccess.file_exists(plugin_cfg_path),
@@ -1982,13 +1982,13 @@ func list_addons(_arguments: Dictionary) -> String:
 
 
 func set_addon_enabled(arguments: Dictionary) -> String:
-	var addon_name := str(arguments.get("addon", "")).strip_edges()
+	var addon_name = str(arguments.get("addon", "")).strip_edges()
 	if addon_name == "":
 		return "Error: 'addon' is required."
 	if not arguments.has("enabled"):
 		return "Error: 'enabled' is required."
 
-	var editor := _editor()
+	var editor = _editor()
 	if not editor.has_method("set_plugin_enabled"):
 		return "Error: This Godot version does not expose EditorInterface.set_plugin_enabled."
 
@@ -2013,12 +2013,12 @@ func list_project_features(_arguments: Dictionary) -> String:
 
 
 func list_project_settings(arguments: Dictionary) -> String:
-	var prefix := str(arguments.get("prefix", "")).strip_edges()
-	var include_internal := bool(arguments.get("include_internal", false))
-	var max_results := clamp(int(arguments.get("max_results", 500)), 1, 5000)
+	var prefix = str(arguments.get("prefix", "")).strip_edges()
+	var include_internal = bool(arguments.get("include_internal", false))
+	var max_results = clamp(int(arguments.get("max_results", 500)), 1, 5000)
 	var settings: Array = []
 	for property_info in ProjectSettings.get_property_list():
-		var name := str(property_info.get("name", ""))
+		var name = str(property_info.get("name", ""))
 		if prefix != "" and not name.begins_with(prefix):
 			continue
 		if not include_internal and name.begins_with("_"):
@@ -2040,7 +2040,7 @@ func list_project_settings(arguments: Dictionary) -> String:
 
 
 func get_project_setting(arguments: Dictionary) -> String:
-	var key := str(arguments.get("key", "")).strip_edges()
+	var key = str(arguments.get("key", "")).strip_edges()
 	if key == "":
 		return "Error: 'key' is required."
 	if not ProjectSettings.has_setting(key):
@@ -2052,13 +2052,13 @@ func get_project_setting(arguments: Dictionary) -> String:
 
 
 func set_project_setting(arguments: Dictionary) -> String:
-	var key := str(arguments.get("key", "")).strip_edges()
+	var key = str(arguments.get("key", "")).strip_edges()
 	if key == "":
 		return "Error: 'key' is required."
 	if not arguments.has("value"):
 		return "Error: 'value' is required."
 	ProjectSettings.set_setting(key, arguments.get("value"))
-	var save_changes := bool(arguments.get("save", true))
+	var save_changes = bool(arguments.get("save", true))
 	if save_changes:
 		ProjectSettings.save()
 	return _render_variant({
@@ -2079,7 +2079,7 @@ func list_input_actions(_arguments: Dictionary) -> String:
 
 
 func get_input_action(arguments: Dictionary) -> String:
-	var action_name := str(arguments.get("action", "")).strip_edges()
+	var action_name = str(arguments.get("action", "")).strip_edges()
 	if action_name == "":
 		return "Error: 'action' is required."
 	if not InputMap.has_action(action_name):
@@ -2088,7 +2088,7 @@ func get_input_action(arguments: Dictionary) -> String:
 
 
 func add_input_action(arguments: Dictionary) -> String:
-	var action_name := str(arguments.get("action", "")).strip_edges()
+	var action_name = str(arguments.get("action", "")).strip_edges()
 	if action_name == "":
 		return "Error: 'action' is required."
 	if not InputMap.has_action(action_name):
@@ -2099,27 +2099,27 @@ func add_input_action(arguments: Dictionary) -> String:
 			var event = _input_event_from_dict(event_data)
 			if event != null:
 				InputMap.action_add_event(action_name, event)
-	var save_changes := bool(arguments.get("save", true))
+	var save_changes = bool(arguments.get("save", true))
 	if save_changes:
 		ProjectSettings.save()
 	return _render_variant(_build_input_action_info(action_name))
 
 
 func remove_input_action(arguments: Dictionary) -> String:
-	var action_name := str(arguments.get("action", "")).strip_edges()
+	var action_name = str(arguments.get("action", "")).strip_edges()
 	if action_name == "":
 		return "Error: 'action' is required."
 	if not InputMap.has_action(action_name):
 		return "Error: Input action not found: %s" % action_name
 	InputMap.erase_action(action_name)
-	var save_changes := bool(arguments.get("save", true))
+	var save_changes = bool(arguments.get("save", true))
 	if save_changes:
 		ProjectSettings.save()
 	return "Removed input action: %s" % action_name
 
 
 func add_input_event_to_action(arguments: Dictionary) -> String:
-	var action_name := str(arguments.get("action", "")).strip_edges()
+	var action_name = str(arguments.get("action", "")).strip_edges()
 	if action_name == "":
 		return "Error: 'action' is required."
 	if not InputMap.has_action(action_name):
@@ -2128,27 +2128,27 @@ func add_input_event_to_action(arguments: Dictionary) -> String:
 	if event == null:
 		return "Error: Could not build InputEvent from 'event'."
 	InputMap.action_add_event(action_name, event)
-	var save_changes := bool(arguments.get("save", true))
+	var save_changes = bool(arguments.get("save", true))
 	if save_changes:
 		ProjectSettings.save()
 	return _render_variant(_build_input_action_info(action_name))
 
 
 func clear_input_events(arguments: Dictionary) -> String:
-	var action_name := str(arguments.get("action", "")).strip_edges()
+	var action_name = str(arguments.get("action", "")).strip_edges()
 	if action_name == "":
 		return "Error: 'action' is required."
 	if not InputMap.has_action(action_name):
 		return "Error: Input action not found: %s" % action_name
 	InputMap.action_erase_events(action_name)
-	var save_changes := bool(arguments.get("save", true))
+	var save_changes = bool(arguments.get("save", true))
 	if save_changes:
 		ProjectSettings.save()
 	return _render_variant(_build_input_action_info(action_name))
 
 
 func list_autoloads(_arguments: Dictionary) -> String:
-	var autoloads := _list_autoloads()
+	var autoloads = _list_autoloads()
 	return _render_variant({
 		"count": autoloads.size(),
 		"autoloads": autoloads,
@@ -2156,14 +2156,14 @@ func list_autoloads(_arguments: Dictionary) -> String:
 
 
 func set_autoload(arguments: Dictionary) -> String:
-	var name := str(arguments.get("name", "")).strip_edges()
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var name = str(arguments.get("name", "")).strip_edges()
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if name == "" or path == "":
 		return "Error: 'name' and 'path' are required."
-	var key := "autoload/%s" % name
-	var value := str(arguments.get("value", path))
+	var key = "autoload/%s" % name
+	var value = str(arguments.get("value", path))
 	ProjectSettings.set_setting(key, value)
-	var save_changes := bool(arguments.get("save", true))
+	var save_changes = bool(arguments.get("save", true))
 	if save_changes:
 		ProjectSettings.save()
 	return _render_variant({
@@ -2174,26 +2174,26 @@ func set_autoload(arguments: Dictionary) -> String:
 
 
 func remove_autoload(arguments: Dictionary) -> String:
-	var name := str(arguments.get("name", "")).strip_edges()
+	var name = str(arguments.get("name", "")).strip_edges()
 	if name == "":
 		return "Error: 'name' is required."
-	var key := "autoload/%s" % name
+	var key = "autoload/%s" % name
 	if not ProjectSettings.has_setting(key):
 		return "Error: Autoload not found: %s" % name
 	ProjectSettings.set_setting(key, null)
-	var save_changes := bool(arguments.get("save", true))
+	var save_changes = bool(arguments.get("save", true))
 	if save_changes:
 		ProjectSettings.save()
 	return "Removed autoload: %s" % name
 
 
 func assert_node_exists(arguments: Dictionary) -> String:
-	var node_path := str(arguments.get("node_path", "")).strip_edges()
+	var node_path = str(arguments.get("node_path", "")).strip_edges()
 	if node_path == "":
 		return "Error: 'node_path' is required."
 	var node = _resolve_node_path(node_path)
-	var exists := node != null
-	var should_exist := bool(arguments.get("should_exist", true))
+	var exists = node != null
+	var should_exist = bool(arguments.get("should_exist", true))
 	if exists != should_exist:
 		return "Error: Node existence assertion failed for '%s' (exists=%s expected=%s)." % [node_path, str(exists), str(should_exist)]
 	return _render_variant({
@@ -2204,8 +2204,8 @@ func assert_node_exists(arguments: Dictionary) -> String:
 
 
 func assert_node_property(arguments: Dictionary) -> String:
-	var node_path := str(arguments.get("node_path", "")).strip_edges()
-	var property_name := str(arguments.get("property", "")).strip_edges()
+	var node_path = str(arguments.get("node_path", "")).strip_edges()
+	var property_name = str(arguments.get("property", "")).strip_edges()
 	if node_path == "" or property_name == "":
 		return "Error: 'node_path' and 'property' are required."
 	var node = _resolve_node_path(node_path)
@@ -2229,17 +2229,17 @@ func assert_node_property(arguments: Dictionary) -> String:
 
 
 func assert_signal_connected(arguments: Dictionary) -> String:
-	var source_path := str(arguments.get("source_path", "")).strip_edges()
-	var target_path := str(arguments.get("target_path", "")).strip_edges()
-	var signal_name := str(arguments.get("signal_name", "")).strip_edges()
-	var method_name := str(arguments.get("method_name", "")).strip_edges()
+	var source_path = str(arguments.get("source_path", "")).strip_edges()
+	var target_path = str(arguments.get("target_path", "")).strip_edges()
+	var signal_name = str(arguments.get("signal_name", "")).strip_edges()
+	var method_name = str(arguments.get("method_name", "")).strip_edges()
 	if source_path == "" or target_path == "" or signal_name == "" or method_name == "":
 		return "Error: 'source_path', 'target_path', 'signal_name', and 'method_name' are required."
 	var source_node = _resolve_node_path(source_path)
 	var target_node = _resolve_node_path(target_path)
 	if source_node == null or target_node == null:
 		return "Error: Source or target node not found."
-	var connected := source_node.is_connected(signal_name, Callable(target_node, method_name))
+	var connected = source_node.is_connected(signal_name, Callable(target_node, method_name))
 	if not connected:
 		return "Error: Signal assertion failed: %s.%s -> %s.%s is not connected." % [source_path, signal_name, target_path, method_name]
 	return _render_variant({
@@ -2252,7 +2252,7 @@ func assert_signal_connected(arguments: Dictionary) -> String:
 
 
 func wait_msec(arguments: Dictionary) -> String:
-	var duration := max(int(arguments.get("duration", 0)), 0)
+	var duration = max(int(arguments.get("duration", 0)), 0)
 	OS.delay_msec(duration)
 	return _render_variant({
 		"duration": duration,
@@ -2260,7 +2260,7 @@ func wait_msec(arguments: Dictionary) -> String:
 
 
 func detect_script_language_mode() -> String:
-	var project_root := ProjectSettings.globalize_path("res://")
+	var project_root = ProjectSettings.globalize_path("res://")
 	var csproj_files: Array = []
 	var sln_files: Array = []
 	var csharp_scripts: Array = []
@@ -2272,8 +2272,8 @@ func detect_script_language_mode() -> String:
 	csharp_scripts = _exclude_internal_plugin_paths(csharp_scripts)
 	gd_scripts = _exclude_internal_plugin_paths(gd_scripts)
 
-	var has_dotnet := csproj_files.size() > 0 or sln_files.size() > 0 or csharp_scripts.size() > 0
-	var has_gdscript := gd_scripts.size() > 0
+	var has_dotnet = csproj_files.size() > 0 or sln_files.size() > 0 or csharp_scripts.size() > 0
+	var has_gdscript = gd_scripts.size() > 0
 	if has_dotnet and has_gdscript:
 		return "mixed"
 	if has_dotnet:
@@ -2282,17 +2282,17 @@ func detect_script_language_mode() -> String:
 
 
 func validate_gdscript_file(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 	if not FileAccess.file_exists(path):
 		return "Error: File not found: %s" % path
 
-	var source := FileAccess.get_file_as_string(path)
-	var script := GDScript.new()
+	var source = FileAccess.get_file_as_string(path)
+	var script = GDScript.new()
 	script.resource_path = path
 	script.source_code = source
-	var err := script.reload()
+	var err = script.reload()
 	return _render_variant({
 		"path": path,
 		"ok": err == OK,
@@ -2302,11 +2302,11 @@ func validate_gdscript_file(arguments: Dictionary) -> String:
 
 
 func validate_script(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path == "":
 		return "Error: 'path' is required."
 
-	var resolved_language := _resolve_requested_script_language(str(arguments.get("language", "auto")).to_lower(), path)
+	var resolved_language = _resolve_requested_script_language(str(arguments.get("language", "auto")).to_lower(), path)
 	if resolved_language == "dotnet":
 		var validation = JSON.parse_string(validate_csharp_project(arguments))
 		if validation is Dictionary:
@@ -2323,9 +2323,9 @@ func validate_script(arguments: Dictionary) -> String:
 
 
 func validate_csharp_project(arguments: Dictionary) -> String:
-	var project_root := ProjectSettings.globalize_path("res://")
+	var project_root = ProjectSettings.globalize_path("res://")
 	var dotnet_info = JSON.parse_string(get_dotnet_project_info({}))
-	var result := {
+	var result = {
 		"project_root": project_root,
 		"is_dotnet_editor": OS.has_feature("dotnet"),
 		"has_csproj": false,
@@ -2344,20 +2344,20 @@ func validate_csharp_project(arguments: Dictionary) -> String:
 		result["has_sln"] = sln_files is Array and sln_files.size() > 0
 
 	var probe_output: Array = []
-	var probe_exit := OS.execute("dotnet", ["--version"], probe_output, true)
+	var probe_exit = OS.execute("dotnet", ["--version"], probe_output, true)
 	result["dotnet_available"] = probe_exit == OK or probe_exit == 0
 
 	if bool(arguments.get("run_build", false)):
 		result["build_attempted"] = true
 		var build_output: Array = []
-		var build_args := ["build"]
-		var target_path := str(arguments.get("target", "")).strip_edges()
+		var build_args = ["build"]
+		var target_path = str(arguments.get("target", "")).strip_edges()
 		if target_path != "":
 			build_args.append(ProjectSettings.globalize_path(_normalize_path(target_path)))
 		if str(arguments.get("configuration", "")).strip_edges() != "":
 			build_args.append("-c")
 			build_args.append(str(arguments.get("configuration")))
-		var build_exit := OS.execute("dotnet", build_args, build_output, true)
+		var build_exit = OS.execute("dotnet", build_args, build_output, true)
 		result["exit_code"] = build_exit
 		result["build_ok"] = build_exit == 0
 		result["output"] = build_output
@@ -2368,12 +2368,12 @@ func validate_csharp_project(arguments: Dictionary) -> String:
 
 
 func get_script_errors(arguments: Dictionary) -> String:
-	var root_path := _normalize_path(str(arguments.get("path", "res://")))
-	var max_files := clamp(int(arguments.get("max_files", 200)), 1, 3000)
-	var requested_language := str(arguments.get("language", "auto")).to_lower()
-	var resolved_language := _resolve_requested_script_language_set(requested_language)
+	var root_path = _normalize_path(str(arguments.get("path", "res://")))
+	var max_files = clamp(int(arguments.get("max_files", 200)), 1, 3000)
+	var requested_language = str(arguments.get("language", "auto")).to_lower()
+	var resolved_language = _resolve_requested_script_language_set(requested_language)
 	var results: Array = []
-	var checked := 0
+	var checked = 0
 
 	if resolved_language == "gdscript" or resolved_language == "mixed":
 		var gd_paths: Array = []
@@ -2381,7 +2381,7 @@ func get_script_errors(arguments: Dictionary) -> String:
 		gd_paths = _exclude_internal_plugin_paths(gd_paths)
 		checked += gd_paths.size()
 		for path in gd_paths:
-			var validation_text := validate_gdscript_file({"path": path})
+			var validation_text = validate_gdscript_file({"path": path})
 			var validation = JSON.parse_string(validation_text)
 			if validation is Dictionary and not bool(validation.get("ok", false)):
 				validation["language"] = "gdscript"
@@ -2415,8 +2415,8 @@ func get_csharp_errors(arguments: Dictionary) -> String:
 	var error_lines: Array = []
 	if output_lines is Array:
 		for line in output_lines:
-			var text := str(line)
-			var normalized := text.to_lower()
+			var text = str(line)
+			var normalized = text.to_lower()
 			if normalized.contains(": error") or normalized.contains(" error ") or normalized.begins_with("error"):
 				error_lines.append(text)
 
@@ -2429,11 +2429,11 @@ func get_csharp_errors(arguments: Dictionary) -> String:
 
 
 func request_script_reload(arguments: Dictionary) -> String:
-	var path := _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_path(str(arguments.get("path", "")))
 	if path != "":
 		var script = load(path)
 		if script != null and script is Script:
-			var err := script.reload()
+			var err = script.reload()
 			_refresh_filesystem()
 			return _render_variant({
 				"path": path,
@@ -2445,8 +2445,8 @@ func request_script_reload(arguments: Dictionary) -> String:
 
 
 func log_message(arguments: Dictionary) -> String:
-	var message := str(arguments.get("message", ""))
-	var level := str(arguments.get("level", "info")).to_lower()
+	var message = str(arguments.get("message", ""))
+	var level = str(arguments.get("level", "info")).to_lower()
 	match level:
 		"error":
 			push_error(message)
@@ -2475,7 +2475,7 @@ func _build_scene_info(scene_root: Node) -> Dictionary:
 
 
 func _build_node_info(node: Node) -> Dictionary:
-	var info := _node_to_summary(node)
+	var info = _node_to_summary(node)
 	info["child_count"] = node.get_child_count()
 	info["groups"] = node.get_groups()
 	info["script"] = node.get_script().resource_path if node.get_script() != null else ""
@@ -2522,7 +2522,7 @@ func _build_control_info(control: Control) -> Dictionary:
 
 
 func _build_camera_info(camera: Node) -> Dictionary:
-	var info := _node_to_summary(camera)
+	var info = _node_to_summary(camera)
 	if camera is Camera2D:
 		info["enabled"] = camera.enabled
 		info["zoom"] = _json_safe(camera.zoom)
@@ -2552,12 +2552,12 @@ func _collect_files(path: String, recursive: bool, include_hidden: bool, max_ent
 	if results.size() >= max_entries:
 		return
 
-	var dir := DirAccess.open(path)
+	var dir = DirAccess.open(path)
 	if dir == null:
 		return
 
 	dir.list_dir_begin()
-	var item := dir.get_next()
+	var item = dir.get_next()
 	while item != "":
 		if results.size() >= max_entries:
 			break
@@ -2565,7 +2565,7 @@ func _collect_files(path: String, recursive: bool, include_hidden: bool, max_ent
 			item = dir.get_next()
 			continue
 
-		var child_path := path.path_join(item)
+		var child_path = path.path_join(item)
 		if dir.current_is_dir():
 			results.append({"path": child_path, "type": "dir"})
 			if recursive:
@@ -2581,16 +2581,16 @@ func _collect_matching_files(path: String, recursive: bool, max_entries: int, re
 	if results.size() >= max_entries:
 		return
 
-	var dir := DirAccess.open(path)
+	var dir = DirAccess.open(path)
 	if dir == null:
 		return
 
 	dir.list_dir_begin()
-	var item := dir.get_next()
+	var item = dir.get_next()
 	while item != "":
 		if results.size() >= max_entries:
 			break
-		var child_path := path.path_join(item)
+		var child_path = path.path_join(item)
 		if dir.current_is_dir():
 			if recursive:
 				_collect_matching_files(child_path, recursive, max_entries, results, extensions)
@@ -2605,26 +2605,26 @@ func _search_files_recursive(path: String, pattern: String, mode: String, recurs
 	if matches.size() >= max_results:
 		return
 
-	var dir := DirAccess.open(path)
+	var dir = DirAccess.open(path)
 	if dir == null:
 		return
 
 	dir.list_dir_begin()
-	var item := dir.get_next()
+	var item = dir.get_next()
 	while item != "":
 		if matches.size() >= max_results:
 			break
 
-		var child_path := path.path_join(item)
+		var child_path = path.path_join(item)
 		if dir.current_is_dir():
 			if recursive:
 				_search_files_recursive(child_path, pattern, mode, recursive, max_results, matches)
 		else:
-			var path_match := child_path.to_lower().contains(pattern.to_lower())
-			var content_match := false
+			var path_match = child_path.to_lower().contains(pattern.to_lower())
+			var content_match = false
 			if mode == "content" or mode == "both":
 				if _matches_extension(child_path, TEXT_EXTENSIONS):
-					var file := FileAccess.open(child_path, FileAccess.READ)
+					var file = FileAccess.open(child_path, FileAccess.READ)
 					if file != null:
 						content_match = file.get_as_text().contains(pattern)
 			if (mode == "path" and path_match) or (mode == "content" and content_match) or (mode == "both" and (path_match or content_match)):
@@ -2639,7 +2639,7 @@ func _search_files_recursive(path: String, pattern: String, mode: String, recurs
 
 
 func _serialize_scene_tree(node: Node, max_depth: int, depth: int = 0) -> Dictionary:
-	var summary := _node_to_summary(node)
+	var summary = _node_to_summary(node)
 	summary["children"] = []
 	if depth >= max_depth:
 		summary["truncated"] = node.get_child_count() > 0
@@ -2679,7 +2679,7 @@ func _resolve_animation_player(node_path: String):
 
 
 func _normalize_path(path: String) -> String:
-	var trimmed := path.strip_edges()
+	var trimmed = path.strip_edges()
 	if trimmed == "":
 		return ""
 	if trimmed.begins_with("res://") or trimmed.begins_with("user://"):
@@ -2688,7 +2688,7 @@ func _normalize_path(path: String) -> String:
 
 
 func _normalize_script_path(path: String, language: String) -> String:
-	var normalized := _normalize_path(path)
+	var normalized = _normalize_path(path)
 	if normalized == "":
 		return ""
 	if normalized.to_lower().ends_with(".gd") or normalized.to_lower().ends_with(".cs"):
@@ -2699,7 +2699,7 @@ func _normalize_script_path(path: String, language: String) -> String:
 
 
 func _resolve_requested_script_language(requested_language: String, path: String) -> String:
-	var normalized_request := requested_language.strip_edges().to_lower()
+	var normalized_request = requested_language.strip_edges().to_lower()
 	if normalized_request in ["gd", "gdscript"]:
 		return "gdscript"
 	if normalized_request in ["csharp", "cs", "dotnet"]:
@@ -2707,13 +2707,13 @@ func _resolve_requested_script_language(requested_language: String, path: String
 	if normalized_request == "mixed":
 		return "mixed"
 
-	var lower_path := path.to_lower()
+	var lower_path = path.to_lower()
 	if lower_path.ends_with(".gd"):
 		return "gdscript"
 	if lower_path.ends_with(".cs"):
 		return "dotnet"
 
-	var detected := detect_script_language_mode()
+	var detected = detect_script_language_mode()
 	if detected == "mixed":
 		var dotnet_info = JSON.parse_string(get_dotnet_project_info({}))
 		if dotnet_info is Dictionary:
@@ -2725,7 +2725,7 @@ func _resolve_requested_script_language(requested_language: String, path: String
 
 
 func _resolve_requested_script_language_set(requested_language: String) -> String:
-	var normalized_request := requested_language.strip_edges().to_lower()
+	var normalized_request = requested_language.strip_edges().to_lower()
 	if normalized_request in ["gd", "gdscript"]:
 		return "gdscript"
 	if normalized_request in ["csharp", "cs", "dotnet"]:
@@ -2736,7 +2736,7 @@ func _resolve_requested_script_language_set(requested_language: String) -> Strin
 
 
 func _ensure_parent_dir(path: String) -> int:
-	var parent_dir := path.get_base_dir()
+	var parent_dir = path.get_base_dir()
 	if parent_dir == "" or parent_dir == "res://" or parent_dir == "user://":
 		return OK
 	return DirAccess.make_dir_recursive_absolute(parent_dir)
@@ -2789,7 +2789,7 @@ func _create_control_internal(control_type: String, arguments: Dictionary) -> St
 
 	if control is TextureRect:
 		if arguments.has("texture_path"):
-			var texture_path := _normalize_path(str(arguments.get("texture_path")))
+			var texture_path = _normalize_path(str(arguments.get("texture_path")))
 			var texture = load(texture_path)
 			if texture != null:
 				control.texture = texture
@@ -2871,11 +2871,11 @@ func _parse_size_flags(value) -> int:
 	if typeof(value) == TYPE_INT:
 		return int(value)
 	if value is Array:
-		var combined := 0
+		var combined = 0
 		for item in value:
 			combined |= _parse_size_flags(item)
 		return combined
-	var normalized := str(value).strip_edges().to_lower()
+	var normalized = str(value).strip_edges().to_lower()
 	if SIZE_FLAG_MAP.has(normalized):
 		return int(SIZE_FLAG_MAP[normalized])
 	return 0
@@ -2884,7 +2884,7 @@ func _parse_size_flags(value) -> int:
 func _get_or_create_animation_library(player: AnimationPlayer, library_name: String):
 	if player.has_animation_library(library_name):
 		return player.get_animation_library(library_name)
-	var library := AnimationLibrary.new()
+	var library = AnimationLibrary.new()
 	player.add_animation_library(library_name, library)
 	return library
 
@@ -2914,7 +2914,7 @@ func _animation_track_type(track_type: String) -> int:
 
 
 func _is_plugin_enabled(addon_name: String) -> bool:
-	var editor := _editor()
+	var editor = _editor()
 	if editor.has_method("is_plugin_enabled"):
 		return bool(editor.is_plugin_enabled(addon_name))
 	var enabled_plugins = ProjectSettings.get_setting("editor_plugins/enabled", PackedStringArray())
@@ -2925,8 +2925,8 @@ func _is_plugin_enabled(addon_name: String) -> bool:
 
 
 func _read_plugin_cfg(path: String) -> Dictionary:
-	var config := ConfigFile.new()
-	var err := config.load(path)
+	var config = ConfigFile.new()
+	var err = config.load(path)
 	if err != OK:
 		return {"config_error": err}
 	return {
@@ -2941,7 +2941,7 @@ func _read_plugin_cfg(path: String) -> Dictionary:
 func _list_autoloads() -> Array:
 	var autoloads: Array = []
 	for property_info in ProjectSettings.get_property_list():
-		var name := str(property_info.get("name", ""))
+		var name = str(property_info.get("name", ""))
 		if name.begins_with("autoload/"):
 			autoloads.append({
 				"name": name.trim_prefix("autoload/"),
@@ -2963,7 +2963,7 @@ func _build_input_action_info(action_name: String) -> Dictionary:
 
 
 func _serialize_input_event(event: InputEvent) -> Dictionary:
-	var data := {
+	var data = {
 		"type": event.get_class(),
 		"as_text": event.as_text(),
 	}
@@ -2987,23 +2987,23 @@ func _serialize_input_event(event: InputEvent) -> Dictionary:
 func _input_event_from_dict(value) -> InputEvent:
 	if not (value is Dictionary):
 		return null
-	var event_type := str(value.get("type", "")).strip_edges().to_lower()
+	var event_type = str(value.get("type", "")).strip_edges().to_lower()
 	match event_type:
 		"key", "inputeventkey":
-			var key_event := InputEventKey.new()
+			var key_event = InputEventKey.new()
 			key_event.pressed = bool(value.get("pressed", true))
 			key_event.echo = bool(value.get("echo", false))
 			key_event.keycode = _to_keycode(value.get("key", value.get("keycode")))
 			key_event.physical_keycode = _to_keycode(value.get("physical_key", value.get("physical_keycode")))
 			return key_event
 		"mouse_button", "inputeventmousebutton":
-			var mouse_event := InputEventMouseButton.new()
+			var mouse_event = InputEventMouseButton.new()
 			mouse_event.pressed = bool(value.get("pressed", true))
 			mouse_event.button_index = _to_mouse_button(value.get("button", value.get("button_index", "left")))
 			mouse_event.position = _to_vector2(value.get("position", Vector2.ZERO))
 			return mouse_event
 		"action", "inputeventaction":
-			var action_event := InputEventAction.new()
+			var action_event = InputEventAction.new()
 			action_event.action = str(value.get("action", ""))
 			action_event.pressed = bool(value.get("pressed", true))
 			action_event.strength = float(value.get("strength", 1.0))
@@ -3017,10 +3017,10 @@ func _values_equal(left, right) -> bool:
 
 
 func _pascal_case(value: String) -> String:
-	var parts := value.replace("-", "_").replace(" ", "_").split("_")
-	var result := ""
+	var parts = value.replace("-", "_").replace(" ", "_").split("_")
+	var result = ""
 	for part in parts:
-		var text := str(part).strip_edges()
+		var text = str(part).strip_edges()
 		if text == "":
 			continue
 		result += text.substr(0, 1).to_upper() + text.substr(1)
@@ -3036,9 +3036,9 @@ func _refresh_filesystem() -> void:
 
 
 func _get_log_files(include_rotated: bool) -> Array:
-	var configured_path := String(ProjectSettings.get_setting("debug/file_logging/log_path", "user://logs/godot.log"))
-	var current_log_path := ProjectSettings.globalize_path(configured_path)
-	var log_dir := current_log_path.get_base_dir()
+	var configured_path = String(ProjectSettings.get_setting("debug/file_logging/log_path", "user://logs/godot.log"))
+	var current_log_path = ProjectSettings.globalize_path(configured_path)
+	var log_dir = current_log_path.get_base_dir()
 	var files: Array = []
 	if not DirAccess.dir_exists_absolute(log_dir):
 		return files
@@ -3054,7 +3054,7 @@ func _get_log_files(include_rotated: bool) -> Array:
 
 
 func _matches_log_filters(line: String, severity: String, filter_text: String) -> bool:
-	var normalized_line := line.to_lower()
+	var normalized_line = line.to_lower()
 	if filter_text != "" and not normalized_line.contains(filter_text.to_lower()):
 		return false
 
@@ -3070,7 +3070,7 @@ func _matches_log_filters(line: String, severity: String, filter_text: String) -
 
 
 func _safe_name(requested_name: String, fallback: String) -> String:
-	var trimmed := requested_name.strip_edges()
+	var trimmed = requested_name.strip_edges()
 	return trimmed if trimmed != "" else fallback
 
 
@@ -3109,7 +3109,7 @@ func _restore_global_transform(node, stored_transform) -> void:
 func _count_nodes(node: Node) -> int:
 	if node == null:
 		return 0
-	var total := 1
+	var total = 1
 	for child in node.get_children():
 		if child is Node:
 			total += _count_nodes(child)
@@ -3149,9 +3149,9 @@ func _find_nodes_recursive(node: Node, name_contains: String, class_name: String
 	if results.size() >= max_results:
 		return
 
-	var name_ok := name_contains == "" or node.name.to_lower().contains(name_contains)
-	var class_ok := class_name == "" or node.is_class(class_name)
-	var script_ok := script_path == "" or (node.get_script() != null and node.get_script().resource_path == script_path)
+	var name_ok = name_contains == "" or node.name.to_lower().contains(name_contains)
+	var class_ok = class_name == "" or node.is_class(class_name)
+	var script_ok = script_path == "" or (node.get_script() != null and node.get_script().resource_path == script_path)
 	if name_ok and class_ok and script_ok:
 		results.append(_node_to_summary(node))
 
@@ -3161,7 +3161,7 @@ func _find_nodes_recursive(node: Node, name_contains: String, class_name: String
 
 
 func _matches_extension(path: String, extensions: Array) -> bool:
-	var lower := path.to_lower()
+	var lower = path.to_lower()
 	for extension in extensions:
 		if lower.ends_with(str(extension).to_lower()):
 			return true
@@ -3171,7 +3171,7 @@ func _matches_extension(path: String, extensions: Array) -> bool:
 func _exclude_internal_plugin_paths(paths: Array) -> Array:
 	var filtered: Array = []
 	for path in paths:
-		var text := str(path).replace("\\", "/")
+		var text = str(path).replace("\\", "/")
 		if text.contains("/addons/funplay_mcp/") or text.begins_with("res://addons/funplay_mcp/"):
 			continue
 		filtered.append(path)
@@ -3186,7 +3186,7 @@ func _to_vector2(value) -> Vector2:
 	if value is Dictionary:
 		return Vector2(float(value.get("x", 0.0)), float(value.get("y", 0.0)))
 	if value is String:
-		var parts := value.split(",")
+		var parts = value.split(",")
 		if parts.size() >= 2:
 			return Vector2(float(parts[0]), float(parts[1]))
 	return Vector2.ZERO
@@ -3204,7 +3204,7 @@ func _to_vector3(value) -> Vector3:
 			float(value.get("z", 0.0))
 		)
 	if value is String:
-		var parts := value.split(",")
+		var parts = value.split(",")
 		if parts.size() >= 3:
 			return Vector3(float(parts[0]), float(parts[1]), float(parts[2]))
 	return Vector3.ZERO
@@ -3215,10 +3215,10 @@ func _to_keycode(value) -> int:
 		return 0
 	if typeof(value) == TYPE_INT:
 		return int(value)
-	var text := str(value).strip_edges()
+	var text = str(value).strip_edges()
 	if text == "":
 		return 0
-	var normalized := text.to_lower()
+	var normalized = text.to_lower()
 	if KEY_NAME_MAP.has(normalized):
 		return int(KEY_NAME_MAP[normalized])
 	if text.length() == 1:
@@ -3231,7 +3231,7 @@ func _to_mouse_button(value) -> int:
 		return MOUSE_BUTTON_LEFT
 	if typeof(value) == TYPE_INT:
 		return int(value)
-	var normalized := str(value).strip_edges().to_lower()
+	var normalized = str(value).strip_edges().to_lower()
 	if MOUSE_BUTTON_MAP.has(normalized):
 		return int(MOUSE_BUTTON_MAP[normalized])
 	return MOUSE_BUTTON_LEFT
@@ -3254,7 +3254,7 @@ func _to_color(value) -> Color:
 			float(value[2]),
 			float(value[3]) if value.size() >= 4 else 1.0
 		)
-	var text := str(value).strip_edges()
+	var text = str(value).strip_edges()
 	if text == "":
 		return Color.WHITE
 	return Color.from_string(text, Color.WHITE)
@@ -3306,7 +3306,7 @@ func _json_safe(value):
 				arr.append(_json_safe(item))
 			return arr
 		TYPE_DICTIONARY:
-			var dict := {}
+			var dict = {}
 			for key in value.keys():
 				dict[str(key)] = _json_safe(value[key])
 			return dict

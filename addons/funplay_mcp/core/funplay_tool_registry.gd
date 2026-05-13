@@ -6,8 +6,8 @@ const FunplayCoreTools = preload("res://addons/funplay_mcp/core/funplay_core_too
 var _plugin
 var _settings
 var _core_tools
-var _tools := {}
-var _profiles := {
+var _tools: Dictionary = {}
+var _profiles: Dictionary = {
 	"core": [],
 	"full": [],
 }
@@ -21,7 +21,7 @@ func _init(plugin, settings) -> void:
 
 
 func list_tools(profile: String) -> Array:
-	var selected_profile := profile if profile in _profiles else "core"
+	var selected_profile: String = profile if profile in _profiles else "core"
 	var tools: Array = []
 	for tool_name in _profiles[selected_profile]:
 		if is_tool_allowed(tool_name, selected_profile):
@@ -42,7 +42,7 @@ func has_tool(name: String) -> bool:
 
 
 func is_tool_allowed(name: String, profile: String) -> bool:
-	var selected_profile := profile if profile in _profiles else "core"
+	var selected_profile: String = profile if profile in _profiles else "core"
 	if not (name in _profiles[selected_profile]):
 		return false
 	if not _tools.has(name):
@@ -50,12 +50,12 @@ func is_tool_allowed(name: String, profile: String) -> bool:
 	var language_modes: Array = _tools[name].get("language_modes", ["universal"])
 	if "universal" in language_modes:
 		return true
-	var current_mode := _core_tools.detect_script_language_mode()
+	var current_mode: String = _core_tools.detect_script_language_mode()
 	return current_mode in language_modes
 
 
 func get_tool_names(profile: String) -> Array:
-	var selected_profile := profile if profile in _profiles else "core"
+	var selected_profile: String = profile if profile in _profiles else "core"
 	var names: Array = []
 	for tool_name in _profiles[selected_profile]:
 		if is_tool_allowed(tool_name, selected_profile):

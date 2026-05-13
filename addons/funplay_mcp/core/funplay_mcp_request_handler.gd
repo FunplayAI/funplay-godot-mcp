@@ -1,13 +1,13 @@
 @tool
 extends RefCounted
 
-const SUPPORTED_PROTOCOL_VERSIONS := [
+const SUPPORTED_PROTOCOL_VERSIONS = [
 	"2025-11-25",
 	"2025-06-18",
 	"2025-03-26",
 	"2024-11-05",
 ]
-const IMAGE_DATA_URI_PREFIX := "data:image/png;base64,"
+const IMAGE_DATA_URI_PREFIX = "data:image/png;base64,"
 
 var _settings
 var _tool_registry
@@ -34,7 +34,7 @@ func handle_request(request: Dictionary) -> Variant:
 	if str(request.get("jsonrpc", "")) != "2.0":
 		return _error_response(request.get("id"), -32600, "Invalid Request: jsonrpc must be '2.0'")
 
-	var method := str(request.get("method", ""))
+	var method = str(request.get("method", ""))
 	if method.strip_edges() == "":
 		return _error_response(request.get("id"), -32600, "Invalid Request: method is required")
 
@@ -104,8 +104,8 @@ func handle_request(request: Dictionary) -> Variant:
 
 
 func _handle_initialize(request: Dictionary, params: Dictionary) -> Dictionary:
-	var requested := str(params.get("protocolVersion", "")).strip_edges()
-	var negotiated := requested if requested in SUPPORTED_PROTOCOL_VERSIONS else SUPPORTED_PROTOCOL_VERSIONS[0]
+	var requested = str(params.get("protocolVersion", "")).strip_edges()
+	var negotiated = requested if requested in SUPPORTED_PROTOCOL_VERSIONS else SUPPORTED_PROTOCOL_VERSIONS[0]
 	return {
 		"id": request.get("id"),
 		"jsonrpc": "2.0",
@@ -125,7 +125,7 @@ func _handle_initialize(request: Dictionary, params: Dictionary) -> Dictionary:
 
 
 func _handle_tool_call(request: Dictionary, params: Dictionary) -> Dictionary:
-	var tool_name := str(params.get("name", "")).strip_edges()
+	var tool_name = str(params.get("name", "")).strip_edges()
 	if tool_name == "":
 		return _error_response(request.get("id"), -32602, "Invalid params: 'name' is required")
 	if not _tool_registry.has_tool(tool_name):
@@ -137,8 +137,8 @@ func _handle_tool_call(request: Dictionary, params: Dictionary) -> Dictionary:
 	if not (arguments is Dictionary):
 		arguments = {}
 
-	var result_text := _tool_registry.call_tool(tool_name, arguments)
-	var status := "success"
+	var result_text = _tool_registry.call_tool(tool_name, arguments)
+	var status = "success"
 	if result_text.begins_with("Error:"):
 		status = "error"
 

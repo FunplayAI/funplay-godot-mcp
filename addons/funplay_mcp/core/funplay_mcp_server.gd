@@ -4,10 +4,10 @@ extends RefCounted
 const FunplayHttpTransport = preload("res://addons/funplay_mcp/core/funplay_http_transport.gd")
 const FunplayMcpRequestHandler = preload("res://addons/funplay_mcp/core/funplay_mcp_request_handler.gd")
 
-const SERVER_NAME := "Funplay MCP Server - Godot"
-const SERVER_VERSION := "0.4.2"
-const DEFAULT_PORT := 8765
-const MAX_LOG_ENTRIES := 50
+const SERVER_NAME = "Funplay MCP Server - Godot"
+const SERVER_VERSION = "0.4.2"
+const DEFAULT_PORT = 8765
+const MAX_LOG_ENTRIES = 50
 
 var _plugin
 var _settings
@@ -17,8 +17,8 @@ var _prompt_provider
 var _transport
 var _request_handler
 var _interaction_log: Array = []
-var _is_running := false
-var _port := DEFAULT_PORT
+var _is_running: bool = false
+var _port: int = DEFAULT_PORT
 
 
 func _init(plugin, settings, tool_registry, resource_provider, prompt_provider) -> void:
@@ -44,8 +44,8 @@ func start() -> Dictionary:
 	if _is_running:
 		return {"ok": true, "message": "Server is already running."}
 
-	var resolved_port := _resolve_startup_port(_settings.server_port)
-	var err := _transport.listen(resolved_port)
+	var resolved_port: int = _resolve_startup_port(_settings.server_port)
+	var err: int = _transport.listen(resolved_port)
 	if err != OK:
 		_is_running = false
 		return {"ok": false, "message": "Failed to start MCP server on port %d." % resolved_port}
@@ -134,7 +134,7 @@ func _handle_http_request(method: String, path: String, body_text: String, heade
 			"body": "Method Not Allowed",
 		}
 
-	var protocol_version := str(headers.get("mcp-protocol-version", "")).strip_edges()
+	var protocol_version: String = str(headers.get("mcp-protocol-version", "")).strip_edges()
 	if protocol_version != "" and not _request_handler.is_protocol_version_supported(protocol_version):
 		return {
 			"status": 400,
@@ -180,11 +180,11 @@ func _handle_http_request(method: String, path: String, body_text: String, heade
 
 
 func _resolve_startup_port(configured_port: int) -> int:
-	var normalized := configured_port if configured_port > 0 else DEFAULT_PORT
+	var normalized: int = configured_port if configured_port > 0 else DEFAULT_PORT
 	if _is_port_available(normalized):
 		return normalized
 
-	var fallback := DEFAULT_PORT + 1
+	var fallback: int = DEFAULT_PORT + 1
 	while fallback < DEFAULT_PORT + 100:
 		if _is_port_available(fallback):
 			return fallback
@@ -194,8 +194,8 @@ func _resolve_startup_port(configured_port: int) -> int:
 
 
 func _is_port_available(port: int) -> bool:
-	var probe := TCPServer.new()
-	var err := probe.listen(port, "127.0.0.1")
+	var probe: TCPServer = TCPServer.new()
+	var err: int = probe.listen(port, "127.0.0.1")
 	if err == OK:
 		probe.stop()
 		return true

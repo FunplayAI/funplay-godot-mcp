@@ -20,7 +20,7 @@ func set_interaction_log_getter(getter: Callable) -> void:
 
 
 func list_resources() -> Array:
-	var resources := [
+	var resources: Array = [
 		{
 			"uri": "godot://project/context",
 			"name": "Project Context",
@@ -100,7 +100,7 @@ func list_resources() -> Array:
 			"mimeType": "application/json",
 		},
 	]
-	var language_mode := _core_tools.detect_script_language_mode()
+	var language_mode: String = _core_tools.detect_script_language_mode()
 	if language_mode == "dotnet" or language_mode == "mixed":
 		resources.append({
 			"uri": "godot://dotnet/project",
@@ -158,10 +158,10 @@ func read_resource(uri: String) -> Dictionary:
 	if uri == "godot://scenes/list":
 		return _content_response(uri, _core_tools.list_scenes({}), "application/json")
 	if uri.begins_with("godot://file/"):
-		var relative_path := uri.trim_prefix("godot://file/")
+		var relative_path: String = uri.trim_prefix("godot://file/")
 		return _content_response(uri, _read_project_file(relative_path), "text/plain")
 	if uri.begins_with("godot://scene/file/"):
-		var scene_relative_path := uri.trim_prefix("godot://scene/file/")
+		var scene_relative_path: String = uri.trim_prefix("godot://scene/file/")
 		return _content_response(uri, _read_project_file(scene_relative_path), "text/plain")
 
 	return {
@@ -190,7 +190,7 @@ func _get_interaction_log() -> Array:
 
 
 func _read_project_file(relative_path: String) -> String:
-	var path := relative_path
+	var path: String = relative_path
 	if not path.begins_with("res://"):
 		path = ("res://" + path.trim_prefix("/")).simplify_path()
 	else:
@@ -199,7 +199,7 @@ func _read_project_file(relative_path: String) -> String:
 	if not FileAccess.file_exists(path):
 		return "Error: File not found: %s" % path
 
-	var file := FileAccess.open(path, FileAccess.READ)
+	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return "Error: Failed to open file: %s" % path
 

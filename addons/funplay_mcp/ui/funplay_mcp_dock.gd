@@ -17,7 +17,7 @@ var _log_text: TextEdit
 var _copy_status_label: Label
 var _config_status_label: Label
 var _config_path_label: Label
-var _last_refresh_msec := 0
+var _last_refresh_msec: int = 0
 
 
 func setup(server, settings, client_config_writer) -> void:
@@ -29,7 +29,7 @@ func setup(server, settings, client_config_writer) -> void:
 
 
 func refresh_live_state(force: bool = false) -> void:
-	var now := Time.get_ticks_msec()
+	var now: int = Time.get_ticks_msec()
 	if not force and now - _last_refresh_msec < 300:
 		return
 	_last_refresh_msec = now
@@ -78,7 +78,7 @@ func _build_ui() -> void:
 	_enable_checkbox.toggled.connect(_on_enable_toggled)
 	add_child(_enable_checkbox)
 
-	var port_label := Label.new()
+	var port_label = Label.new()
 	port_label.text = "Port"
 	add_child(port_label)
 
@@ -89,7 +89,7 @@ func _build_ui() -> void:
 	_port_spinbox.value_changed.connect(_on_port_changed)
 	add_child(_port_spinbox)
 
-	var profile_label := Label.new()
+	var profile_label = Label.new()
 	profile_label.text = "Tool Profile"
 	add_child(profile_label)
 
@@ -99,7 +99,7 @@ func _build_ui() -> void:
 	_profile_button.item_selected.connect(_on_profile_selected)
 	add_child(_profile_button)
 
-	var client_label := Label.new()
+	var client_label = Label.new()
 	client_label.text = "Client Config Snippet"
 	add_child(client_label)
 
@@ -110,16 +110,16 @@ func _build_ui() -> void:
 	_client_button.item_selected.connect(_on_client_selected)
 	add_child(_client_button)
 
-	var action_row := HBoxContainer.new()
+	var action_row = HBoxContainer.new()
 	action_row.add_theme_constant_override("separation", 6)
 	add_child(action_row)
 
-	var copy_button := Button.new()
+	var copy_button = Button.new()
 	copy_button.text = "Copy Snippet"
 	copy_button.pressed.connect(_copy_snippet)
 	action_row.add_child(copy_button)
 
-	var configure_button := Button.new()
+	var configure_button = Button.new()
 	configure_button.text = "Configure"
 	configure_button.pressed.connect(_configure_client)
 	action_row.add_child(configure_button)
@@ -140,7 +140,7 @@ func _build_ui() -> void:
 	_snippet_text.size_flags_vertical = Control.SIZE_FILL
 	add_child(_snippet_text)
 
-	var log_label := Label.new()
+	var log_label = Label.new()
 	log_label.text = "Recent Activity"
 	add_child(log_label)
 
@@ -168,7 +168,7 @@ func _on_port_changed(value: float) -> void:
 
 
 func _on_profile_selected(index: int) -> void:
-	var value := "core" if index == 0 else "full"
+	var value: String = "core" if index == 0 else "full"
 	_settings.update_tool_profile(value)
 	if _server.is_running():
 		_server.restart()
@@ -185,19 +185,19 @@ func _copy_snippet() -> void:
 
 
 func _configure_client() -> void:
-	var target := _get_selected_target()
-	var result := _client_config_writer.configure_target(target)
+	var target: Dictionary = _get_selected_target()
+	var result: Dictionary = _client_config_writer.configure_target(target)
 	_copy_status_label.text = result.get("message", "")
 	refresh_live_state(true)
 
 
 func _build_client_snippet(client_name: String) -> String:
-	var target := _get_selected_target()
+	var target: Dictionary = _get_selected_target()
 	return _client_config_writer.build_snippet(target)
 
 
 func _build_log_text() -> String:
-	var log_entries := _server.get_interaction_log()
+	var log_entries: Array = _server.get_interaction_log()
 	if log_entries.is_empty():
 		return "No activity yet."
 
@@ -213,9 +213,9 @@ func _build_log_text() -> String:
 
 
 func _get_selected_target() -> Dictionary:
-	var endpoint := _server.get_endpoint() if _server.is_running() else "http://127.0.0.1:%d/" % _settings.server_port
-	var targets := _client_config_writer.list_targets(endpoint)
-	var selected_name := _client_button.get_item_text(_client_button.selected)
+	var endpoint: String = _server.get_endpoint() if _server.is_running() else "http://127.0.0.1:%d/" % _settings.server_port
+	var targets: Array = _client_config_writer.list_targets(endpoint)
+	var selected_name: String = _client_button.get_item_text(_client_button.selected)
 	for target in targets:
 		if str(target.get("name", "")) == selected_name:
 			return target
@@ -226,12 +226,12 @@ func _refresh_config_status() -> void:
 	if _config_status_label == null or _config_path_label == null or _client_config_writer == null:
 		return
 
-	var target := _get_selected_target()
+	var target: Dictionary = _get_selected_target()
 	if target.is_empty():
 		_config_status_label.text = "Config status: unavailable"
 		_config_path_label.text = ""
 		return
 
-	var exists := _client_config_writer.target_exists(target)
+	var exists: bool = _client_config_writer.target_exists(target)
 	_config_status_label.text = "Config status: Configured" if exists else "Config status: Not configured"
 	_config_path_label.text = str(target.get("path", ""))

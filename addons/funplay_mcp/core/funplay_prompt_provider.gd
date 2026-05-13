@@ -87,7 +87,7 @@ func get_prompt(name: String, arguments: Dictionary) -> Dictionary:
 				}],
 			}
 		"feature_plan":
-			var goal := str(arguments.get("goal", "")).strip_edges()
+			var goal = str(arguments.get("goal", "")).strip_edges()
 			return {
 				"description": "Plan a Godot implementation in steps grounded in the current project context.",
 				"messages": [{
@@ -99,7 +99,7 @@ func get_prompt(name: String, arguments: Dictionary) -> Dictionary:
 				}],
 			}
 		"runtime_debug":
-			var issue := str(arguments.get("issue", "")).strip_edges()
+			var issue = str(arguments.get("issue", "")).strip_edges()
 			return {
 				"description": "Debug a Godot runtime problem using current editor signals.",
 				"messages": [{
@@ -118,8 +118,8 @@ func get_prompt(name: String, arguments: Dictionary) -> Dictionary:
 				}],
 			}
 		"script_patch":
-			var path := str(arguments.get("path", "")).strip_edges()
-			var goal_text := str(arguments.get("goal", "")).strip_edges()
+			var path = str(arguments.get("path", "")).strip_edges()
+			var goal_text = str(arguments.get("goal", "")).strip_edges()
 			return {
 				"description": "Patch a Godot script with current file context.",
 				"messages": [{
@@ -135,7 +135,7 @@ func get_prompt(name: String, arguments: Dictionary) -> Dictionary:
 					}],
 				}
 		"ui_layout_plan":
-			var ui_goal := str(arguments.get("goal", "")).strip_edges()
+			var ui_goal = str(arguments.get("goal", "")).strip_edges()
 			return {
 				"description": "Plan a Godot UI hierarchy and layout approach.",
 				"messages": [{

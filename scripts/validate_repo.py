@@ -77,7 +77,7 @@ def add_version_errors(errors: list[str], plugin_version: str) -> None:
         return
 
     server_text = read_text(SERVER)
-    match = re.search(r'const SERVER_VERSION := "([^"]+)"', server_text)
+    match = re.search(r'const SERVER_VERSION\s*(?::=|=)\s*"([^"]+)"', server_text)
     if not match:
         errors.append("funplay_mcp_server.gd is missing SERVER_VERSION")
         return
@@ -96,7 +96,7 @@ def add_protocol_errors(errors: list[str]) -> None:
         return
 
     text = read_text(REQUEST_HANDLER)
-    match = re.search(r"SUPPORTED_PROTOCOL_VERSIONS := \[(.*?)\]", text, re.S)
+    match = re.search(r"SUPPORTED_PROTOCOL_VERSIONS\s*(?::=|=)\s*\[(.*?)\]", text, re.S)
     if not match:
         errors.append("SUPPORTED_PROTOCOL_VERSIONS is missing")
         return
