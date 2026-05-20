@@ -17,6 +17,8 @@ func _init(plugin, settings) -> void:
 	_plugin = plugin
 	_settings = settings
 	_core_tools = FunplayCoreTools.new(plugin, settings)
+	if _core_tools.has_method("set_tool_registry"):
+		_core_tools.set_tool_registry(self)
 	_register_tools()
 
 
@@ -47,6 +49,8 @@ func is_tool_allowed(name: String, profile: String) -> bool:
 		return false
 	if not _tools.has(name):
 		return false
+	if _settings != null and _settings.has_method("is_tool_disabled") and _settings.is_tool_disabled(name):
+		return false
 	var language_modes: Array = _tools[name].get("language_modes", ["universal"])
 	if "universal" in language_modes:
 		return true
@@ -63,10 +67,62 @@ func get_tool_names(profile: String) -> Array:
 	return names
 
 
+func get_tool_exposure(profile: String) -> Array:
+	var selected_profile: String = profile if profile in _profiles else "core"
+	var language_mode: String = _core_tools.detect_script_language_mode()
+	var tools: Array = []
+	for tool_name in _profiles[selected_profile]:
+		if not _tools.has(tool_name):
+			continue
+
+		var tool_data: Dictionary = _tools[tool_name]
+		var language_modes: Array = tool_data.get("language_modes", ["universal"])
+		var language_allowed: bool = "universal" in language_modes or language_mode in language_modes
+		var disabled: bool = _settings != null and _settings.has_method("is_tool_disabled") and _settings.is_tool_disabled(tool_name)
+		var definition: Dictionary = tool_data.get("definition", {})
+		tools.append({
+			"name": tool_name,
+			"description": str(definition.get("description", "")),
+			"profiles": _get_tool_profiles(tool_name),
+			"language_modes": language_modes,
+			"language_allowed": language_allowed,
+			"disabled": disabled,
+			"exposed": language_allowed and not disabled,
+		})
+	return tools
+
+
+func get_exposure_summary(profile: String) -> Dictionary:
+	var tools: Array = get_tool_exposure(profile)
+	var exposed_count: int = 0
+	var disabled_count: int = 0
+	var language_hidden_count: int = 0
+	for tool in tools:
+		if bool(tool.get("exposed", false)):
+			exposed_count += 1
+		elif bool(tool.get("disabled", false)):
+			disabled_count += 1
+		else:
+			language_hidden_count += 1
+	return {
+		"profile": profile if profile in _profiles else "core",
+		"language_mode": _core_tools.detect_script_language_mode(),
+		"total_in_profile": tools.size(),
+		"exposed": exposed_count,
+		"disabled": disabled_count,
+		"language_hidden": language_hidden_count,
+		"tools": tools,
+	}
+
+
 func _register_tools() -> void:
-	_register_tool("execute_code", "Primary high-flexibility Godot editor execution tool. Runs a GDScript snippet inside run(ctx).", {
+	_register_tool("execute_code", "Primary high-flexibility Godot editor execution tool. Runs a GDScript snippet inside run(ctx), with context helpers, logs, and change tracking.", {
 		"type": "object",
-		"properties": {"code": {"type": "string"}},
+		"properties": {
+			"code": {"type": "string"},
+			"context_mode": {"type": "string", "enum": ["dictionary", "object"], "default": "dictionary"},
+			"include_metadata": {"type": "boolean", "default": true},
+		},
 		"required": ["code"],
 	}, "execute_code", ["core", "full"])
 
@@ -304,6 +360,14 @@ func _register_tools() -> void:
 		},
 		"required": ["message"],
 	}, "log_message", ["core", "full"])
+	_register_tool("get_project_skills_status", "Return whether Funplay project skill files have been generated.", _empty_schema(), "get_project_skills_status", ["core", "full"])
+	_register_tool("generate_project_skills", "Generate Funplay project skill files and an optional AGENTS.md bridge for AI clients.", {
+		"type": "object",
+		"properties": {
+			"endpoint": {"type": "string"},
+			"include_agents_bridge": {"type": "boolean", "default": true},
+		},
+	}, "generate_project_skills", ["core", "full"])
 	_register_tool("list_project_features", "Return project settings such as main scene, input actions, and autoloads.", _empty_schema(), "list_project_features", ["core", "full"])
 	_register_tool("list_project_settings", "List ProjectSettings entries, optionally filtered by prefix.", {
 		"type": "object",
@@ -914,6 +978,15 @@ func _register_tool(name: String, description: String, input_schema: Dictionary,
 		if not _profiles.has(profile_name):
 			_profiles[profile_name] = []
 		_profiles[profile_name].append(name)
+
+
+func _get_tool_profiles(tool_name: String) -> Array:
+	var profiles: Array = []
+	for profile_name in _profiles.keys():
+		if tool_name in _profiles[profile_name]:
+			profiles.append(profile_name)
+	profiles.sort()
+	return profiles
 
 
 func _empty_schema() -> Dictionary:

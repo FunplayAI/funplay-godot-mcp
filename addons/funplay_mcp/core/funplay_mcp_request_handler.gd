@@ -145,7 +145,7 @@ func _handle_tool_call(request: Dictionary, params: Dictionary) -> Dictionary:
 	if _interaction_logger.is_valid():
 		_interaction_logger.call(tool_name, status, result_text)
 
-	return {
+	var tool_result: Dictionary = {
 		"id": request.get("id"),
 		"jsonrpc": "2.0",
 		"result": {
@@ -153,6 +153,10 @@ func _handle_tool_call(request: Dictionary, params: Dictionary) -> Dictionary:
 			"isError": status == "error",
 		},
 	}
+	var structured_content: Dictionary = _build_structured_content(result_text)
+	if not structured_content.is_empty():
+		tool_result["result"]["structuredContent"] = structured_content
+	return tool_result
 
 
 func is_protocol_version_supported(version: String) -> bool:
@@ -192,3 +196,17 @@ func _build_content(result_text: String) -> Array:
 		"type": "text",
 		"text": result_text,
 	}]
+
+
+func _build_structured_content(result_text: String) -> Dictionary:
+	if result_text.begins_with(IMAGE_DATA_URI_PREFIX):
+		return {}
+	var trimmed: String = result_text.strip_edges()
+	if not (trimmed.begins_with("{") or trimmed.begins_with("[")):
+		return {}
+	var parsed = JSON.parse_string(trimmed)
+	if parsed is Dictionary:
+		return parsed
+	if parsed is Array:
+		return {"items": parsed}
+	return {}

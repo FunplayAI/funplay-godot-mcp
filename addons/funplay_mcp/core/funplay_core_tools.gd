@@ -1,6 +1,8 @@
 @tool
 extends RefCounted
 
+const FunplayProjectSkillManager = preload("res://addons/funplay_mcp/core/funplay_project_skill_manager.gd")
+
 const SCENE_EXTENSIONS = [".tscn", ".scn"]
 const TEXT_EXTENSIONS = [
 	".gd", ".gdshader", ".tres", ".tscn", ".json", ".txt", ".md",
@@ -37,13 +39,158 @@ const SIZE_FLAG_MAP = {
 	"shrink_end": 8,
 }
 
+class ExecutionContext:
+	extends RefCounted
+
+	var plugin
+	var settings
+	var editor_interface
+	var logs: Array = []
+	var changes: Array = []
+
+	func setup(plugin_ref, settings_ref) -> void:
+		plugin = plugin_ref
+		settings = settings_ref
+		editor_interface = plugin.get_editor_interface() if plugin != null else null
+
+	func log(message) -> void:
+		_add_log("info", message)
+
+	func log_warning(message) -> void:
+		_add_log("warning", message)
+		push_warning(str(message))
+
+	func log_error(message) -> void:
+		_add_log("error", message)
+		push_error(str(message))
+
+	func register_object_creation(object, note: String = "") -> Dictionary:
+		var summary: Dictionary = object_summary(object)
+		changes.append({
+			"kind": "created",
+			"object": summary,
+			"note": note,
+		})
+		return summary
+
+	func register_object_modification(object, property_name: String = "", old_value = null, new_value = null, note: String = "") -> Dictionary:
+		var summary: Dictionary = object_summary(object)
+		changes.append({
+			"kind": "modified",
+			"object": summary,
+			"property": property_name,
+			"old_value": _safe_variant(old_value),
+			"new_value": _safe_variant(new_value),
+			"note": note,
+		})
+		return summary
+
+	func register_object_deletion(object, note: String = "") -> Dictionary:
+		var summary: Dictionary = object_summary(object)
+		changes.append({
+			"kind": "deleted",
+			"object": summary,
+			"note": note,
+		})
+		return summary
+
+	func destroy_object(object, note: String = "") -> Dictionary:
+		var summary: Dictionary = register_object_deletion(object, note)
+		if object is Node:
+			var parent = object.get_parent()
+			if parent != null:
+				parent.remove_child(object)
+			object.free()
+		elif object is Object and object.has_method("free"):
+			object.free()
+		return summary
+
+	func object_summary(object) -> Dictionary:
+		if object == null:
+			return {}
+		if object is Node:
+			return {
+				"id": str(object.get_instance_id()),
+				"instance_id": object.get_instance_id(),
+				"name": object.name,
+				"type": object.get_class(),
+				"path": str(object.get_path()),
+				"scene_file_path": object.scene_file_path,
+			}
+		if object is Resource:
+			return {
+				"id": str(object.get_instance_id()),
+				"instance_id": object.get_instance_id(),
+				"type": object.get_class(),
+				"resource_path": object.resource_path,
+			}
+		if object is Object:
+			return {
+				"id": str(object.get_instance_id()),
+				"instance_id": object.get_instance_id(),
+				"type": object.get_class(),
+				"string": str(object),
+			}
+		return {
+			"type": typeof(object),
+			"string": str(object),
+		}
+
+	func get_logs() -> Array:
+		return logs.duplicate(true)
+
+	func get_changes() -> Array:
+		return changes.duplicate(true)
+
+	func _add_log(level: String, message) -> void:
+		var item = {
+			"level": level,
+			"message": str(message),
+			"timestamp": Time.get_datetime_string_from_system(true, true),
+		}
+		logs.append(item)
+		if settings != null and settings.debug_logging_enabled:
+			print("[Funplay MCP execute_code] [%s] %s" % [level, str(message)])
+
+	func _safe_variant(value):
+		match typeof(value):
+			TYPE_NIL:
+				return null
+			TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING:
+				return value
+			TYPE_VECTOR2:
+				return {"x": value.x, "y": value.y}
+			TYPE_VECTOR3:
+				return {"x": value.x, "y": value.y, "z": value.z}
+			TYPE_COLOR:
+				return {"r": value.r, "g": value.g, "b": value.b, "a": value.a}
+			TYPE_ARRAY:
+				var arr: Array = []
+				for item in value:
+					arr.append(_safe_variant(item))
+				return arr
+			TYPE_DICTIONARY:
+				var dict = {}
+				for key in value.keys():
+					dict[str(key)] = _safe_variant(value[key])
+				return dict
+			TYPE_OBJECT:
+				return object_summary(value)
+			_:
+				return str(value)
+
 var _plugin
 var _settings
+var _tool_registry
 
 
 func _init(plugin, settings) -> void:
 	_plugin = plugin
 	_settings = settings
+
+
+func set_tool_registry(tool_registry) -> void:
+	_tool_registry = tool_registry
 
 
 func execute_code(arguments: Dictionary) -> String:
@@ -74,25 +221,28 @@ func execute_code(arguments: Dictionary) -> String:
 	if instance == null or not instance.has_method("run"):
 		return "Error: Dynamic GDScript snippet must define run(ctx)."
 
-	var editor = _editor()
-	var context = {
-		"plugin": _plugin,
-		"editor_interface": editor,
-		"scene_root": editor.get_edited_scene_root(),
-		"selection": editor.get_selection().get_selected_nodes(),
-		"project_root": ProjectSettings.globalize_path("res://"),
-		"resource_filesystem": editor.get_resource_filesystem(),
-		"open_scenes": editor.get_open_scenes(),
-		"is_playing_scene": editor.is_playing_scene(),
-		"time_scale": Engine.time_scale,
-		"settings": {
-			"tool_profile": _settings.tool_profile if _settings != null else "core",
-			"server_port": _settings.server_port if _settings != null else 8765,
-		},
-	}
+	var execution_context = ExecutionContext.new()
+	execution_context.setup(_plugin, _settings)
+	var before_snapshot: Dictionary = _build_execution_snapshot()
+	var context = _build_execute_code_context(execution_context)
+	var context_mode: String = str(arguments.get("context_mode", "dictionary")).to_lower()
+	var result = instance.call("run", execution_context if context_mode == "object" else context)
+	var after_snapshot: Dictionary = _build_execution_snapshot()
+	var include_metadata: bool = bool(arguments.get("include_metadata", true))
 
-	var result = instance.call("run", context)
-	return _render_variant(result)
+	if not include_metadata:
+		return _render_variant(result)
+
+	return _render_variant({
+		"result": _json_safe(result),
+		"logs": execution_context.get_logs(),
+		"changes": execution_context.get_changes(),
+		"auto_changes": _diff_execution_snapshots(before_snapshot, after_snapshot),
+		"context": {
+			"before": before_snapshot,
+			"after": after_snapshot,
+		},
+	})
 
 
 func get_project_info(_arguments: Dictionary) -> String:
@@ -112,6 +262,8 @@ func get_project_info(_arguments: Dictionary) -> String:
 		"tool_profile": _settings.tool_profile if _settings != null else "core",
 		"server_enabled": _settings.server_enabled if _settings != null else true,
 		"server_port": _settings.server_port if _settings != null else 8765,
+		"debug_logging_enabled": _settings.debug_logging_enabled if _settings != null else false,
+		"disabled_tool_count": _settings.disabled_tools.size() if _settings != null else 0,
 	}
 	return _render_variant(info)
 
@@ -2460,6 +2612,89 @@ func log_message(arguments: Dictionary) -> String:
 	})
 
 
+func get_project_skills_status(_arguments: Dictionary) -> String:
+	var manager = FunplayProjectSkillManager.new()
+	return _render_variant(manager.get_status())
+
+
+func generate_project_skills(arguments: Dictionary) -> String:
+	var endpoint: String = str(arguments.get("endpoint", "http://127.0.0.1:%d/" % (_settings.server_port if _settings != null else 8765)))
+	var include_agents_bridge: bool = bool(arguments.get("include_agents_bridge", true))
+	var manager = FunplayProjectSkillManager.new()
+	return _render_variant(manager.generate_project_skills(endpoint, _settings, _tool_registry, include_agents_bridge))
+
+
+func _build_execute_code_context(execution_context: ExecutionContext) -> Dictionary:
+	var editor = _editor()
+	return {
+		"api": execution_context,
+		"plugin": _plugin,
+		"editor_interface": editor,
+		"scene_root": editor.get_edited_scene_root(),
+		"selection": editor.get_selection().get_selected_nodes(),
+		"project_root": ProjectSettings.globalize_path("res://"),
+		"resource_filesystem": editor.get_resource_filesystem(),
+		"open_scenes": editor.get_open_scenes(),
+		"is_playing_scene": editor.is_playing_scene(),
+		"time_scale": Engine.time_scale,
+		"log": Callable(execution_context, "log"),
+		"log_warning": Callable(execution_context, "log_warning"),
+		"log_error": Callable(execution_context, "log_error"),
+		"register_object_creation": Callable(execution_context, "register_object_creation"),
+		"register_object_modification": Callable(execution_context, "register_object_modification"),
+		"register_object_deletion": Callable(execution_context, "register_object_deletion"),
+		"destroy_object": Callable(execution_context, "destroy_object"),
+		"object_summary": Callable(execution_context, "object_summary"),
+		"settings": {
+			"tool_profile": _settings.tool_profile if _settings != null else "core",
+			"server_port": _settings.server_port if _settings != null else 8765,
+			"debug_logging_enabled": _settings.debug_logging_enabled if _settings != null else false,
+		},
+	}
+
+
+func _build_execution_snapshot() -> Dictionary:
+	var editor = _editor()
+	var scene_root = editor.get_edited_scene_root()
+	var nodes_by_id: Dictionary = {}
+	_collect_scene_nodes_by_id(scene_root, nodes_by_id)
+	return {
+		"scene_root": _node_to_summary(scene_root),
+		"node_count": nodes_by_id.size(),
+		"node_ids": nodes_by_id.keys(),
+		"is_playing_scene": editor.is_playing_scene(),
+		"open_scenes": editor.get_open_scenes(),
+		"time_scale": Engine.time_scale,
+	}
+
+
+func _diff_execution_snapshots(before: Dictionary, after: Dictionary) -> Dictionary:
+	var before_ids: Array = before.get("node_ids", [])
+	var after_ids: Array = after.get("node_ids", [])
+	var created_ids: Array = []
+	var removed_ids: Array = []
+	for id_value in after_ids:
+		if not (id_value in before_ids):
+			created_ids.append(id_value)
+	for id_value in before_ids:
+		if not (id_value in after_ids):
+			removed_ids.append(id_value)
+	return {
+		"created_node_ids": created_ids,
+		"removed_node_ids": removed_ids,
+		"node_count_delta": int(after.get("node_count", 0)) - int(before.get("node_count", 0)),
+	}
+
+
+func _collect_scene_nodes_by_id(node: Node, results: Dictionary) -> void:
+	if node == null:
+		return
+	results[str(node.get_instance_id())] = _node_to_summary(node)
+	for child in node.get_children():
+		if child is Node:
+			_collect_scene_nodes_by_id(child, results)
+
+
 func _editor():
 	return _plugin.get_editor_interface()
 
@@ -2499,6 +2734,8 @@ func _build_node_info(node: Node) -> Dictionary:
 
 func _build_control_info(control: Control) -> Dictionary:
 	return {
+		"id": str(control.get_instance_id()),
+		"instance_id": control.get_instance_id(),
 		"name": control.name,
 		"type": control.get_class(),
 		"path": str(control.get_path()),
@@ -2655,13 +2892,19 @@ func _resolve_node_path(node_path: String):
 	var scene_root = _editor().get_edited_scene_root()
 	if scene_root == null:
 		return null
-	if node_path == "" or node_path == ".":
+	var identifier: String = node_path.strip_edges()
+	if identifier == "" or identifier == ".":
 		return scene_root
-	if str(scene_root.get_path()) == node_path:
+	var id_text: String = identifier.trim_prefix("id:") if identifier.begins_with("id:") else identifier
+	if id_text.is_valid_int():
+		var object = instance_from_id(int(id_text))
+		if object is Node:
+			return object
+	if str(scene_root.get_path()) == identifier:
 		return scene_root
-	if node_path.begins_with("/"):
-		return scene_root.get_tree().root.get_node_or_null(NodePath(node_path))
-	return scene_root.get_node_or_null(NodePath(node_path))
+	if identifier.begins_with("/"):
+		return scene_root.get_tree().root.get_node_or_null(NodePath(identifier))
+	return scene_root.get_node_or_null(NodePath(identifier))
 
 
 func _resolve_control(node_path: String) -> Control:
@@ -3271,6 +3514,8 @@ func _node_to_summary(node) -> Variant:
 	if node == null:
 		return null
 	return {
+		"id": str(node.get_instance_id()),
+		"instance_id": node.get_instance_id(),
 		"name": node.name,
 		"type": node.get_class(),
 		"path": str(node.get_path()),
@@ -3315,10 +3560,14 @@ func _json_safe(value):
 				return _node_to_summary(value)
 			if value is Resource:
 				return {
+					"id": str(value.get_instance_id()),
+					"instance_id": value.get_instance_id(),
 					"type": value.get_class(),
 					"resource_path": value.resource_path,
 				}
 			return {
+				"id": str(value.get_instance_id()),
+				"instance_id": value.get_instance_id(),
 				"type": value.get_class(),
 				"string": str(value),
 			}

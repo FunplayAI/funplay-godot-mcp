@@ -46,6 +46,12 @@ func list_resources() -> Array:
 			"mimeType": "application/json",
 		},
 		{
+			"uri": "godot://project/skills",
+			"name": "Project Skills",
+			"description": "Generated Funplay project skill status and file paths.",
+			"mimeType": "application/json",
+		},
+		{
 			"uri": "godot://logs/recent",
 			"name": "Recent Logs",
 			"description": "Recent lines from Godot's project log files.",
@@ -137,6 +143,8 @@ func read_resource(uri: String) -> Dictionary:
 		return _content_response(uri, _core_tools.get_selection({}), "application/json")
 	if uri == "godot://interaction/history":
 		return _content_response(uri, JSON.stringify(_get_interaction_log(), "\t"), "application/json")
+	if uri == "godot://project/skills":
+		return _content_response(uri, _core_tools.get_project_skills_status({}), "application/json")
 	if uri == "godot://logs/recent":
 		return _content_response(uri, _core_tools.get_console_logs({}), "application/json")
 	if uri == "godot://scripts/errors":

@@ -64,6 +64,7 @@ If that port is already occupied, it automatically picks another free local port
 Use the built-in **One-Click MCP Configuration** in the `Funplay MCP` dock first.
 
 Select your target client, click **Configure**, and the addon writes the recommended MCP config entry for you.
+Use **Configure + Skills** when you also want the addon to generate project-local skill files under `res://.funplay/skills/` and an `AGENTS.md` bridge for AI clients that read repository instructions.
 
 If Godot had to pick a different port, use the endpoint shown in the dock.
 If you prefer to edit config files manually, use the examples below as fallback references:
@@ -145,12 +146,15 @@ Open your AI client and try: *"Create a 2D HUD with health bar, score label, and
 - The MCP server starts on `http://127.0.0.1:8765/` by default, but automatically falls back to another free local port if needed.
 - Local MCP server settings are stored in `user://funplay_mcp_settings.cfg`.
 - The addon defaults to the `core` MCP tool profile to reduce tool-list noise for AI clients. Switch to `full` in the dock if you want the complete tool surface.
+- The dock includes a Tool Exposure panel for disabling individual tools within the active profile, plus an optional debug logging toggle for MCP activity.
 - All exposed MCP tools run directly. There is no extra approval toggle inside the addon.
 - The built-in dock can copy or write recommended MCP config entries for Codex, Claude Code, Cursor, and VS Code.
 
 ## Why This Project
 
 - **`execute_code` First** — The addon is optimized around one high-flexibility GDScript execution tool for rich editor/runtime orchestration when many small tools would be noisy
+- **Tool Exposure Control** — Toggle individual tools from the Godot dock without editing addon code or restarting the project
+- **Project Skills** — Generate project-local AI guidance files that capture the current endpoint, tool profile, project context, and recommended Funplay workflow
 - **Play Mode Automation** — Enter play mode, simulate input, inspect logs, capture editor views, and validate behavior from the same MCP session
 - **Project Context Built In** — Exposes live resources for project state, active scene, selection, play state, script errors, logs, and MCP interaction history
 - **Focused by Default, Full When Needed** — `core` exposes a compact high-signal toolset; `full` exposes a broader editor automation surface
@@ -159,8 +163,9 @@ Open your AI client and try: *"Create a 2D HUD with health bar, score label, and
 
 ## Highlights
 
-- **105 Built-in Tools** — Scene editing, PackedScene workflows, language-aware script tools, project settings, input map, autoloads, runtime assertions, files, play mode control, UI controls, animation, camera, performance, resources, prompts, and editor automation
+- **107 Built-in Tools** — Scene editing, PackedScene workflows, language-aware script tools, project settings, input map, autoloads, runtime assertions, files, project skills, play mode control, UI controls, animation, camera, performance, resources, prompts, and editor automation
 - **Resources & Prompts** — Live project context, scene/selection/error resources, language-aware script diagnostics, `.NET` project resources when applicable, resource templates, and reusable workflow prompts
+- **Structured Results** — JSON tool outputs are mirrored into MCP `structuredContent`, and node/resource summaries include session `instance_id` values for follow-up calls
 - **Input Simulation + View Capture** — Drive play mode with action/key/mouse simulation and verify results with captured editor views
 - **One-Click Client Configuration** — Generate MCP config entries for Codex, Claude Code, Cursor, and VS Code directly from the Godot dock
 - **UI/Control Tooling** — Build CanvasLayer and Control hierarchies, set layouts, apply theme overrides, wire signals, and create HUDs through MCP
@@ -184,14 +189,14 @@ The table below compares this repository with the public behavior and positionin
 
 The current open-source package exposes four high-value capability layers:
 
-- **Tools** — 105 total registered tools across scene editing, scripts, project configuration, input map, autoloads, runtime assertions, files, UI, animation, camera, diagnostics, and automation. Script-related tools are filtered by detected project language.
-- **Primary execution** — `execute_code` for rich editor/runtime orchestration
+- **Tools** — 107 total registered tools across scene editing, scripts, project configuration, input map, autoloads, runtime assertions, files, project skills, UI, animation, camera, diagnostics, and automation. Script-related tools are filtered by detected project language and the dock's Tool Exposure settings.
+- **Primary execution** — `execute_code` for rich editor/runtime orchestration, with optional object-style context helpers, logs, and change tracking metadata
 - **Prompts** — workflow prompts like `scene_review`, `feature_plan`, `runtime_debug`, `script_patch`, and `ui_layout_plan`
 - **Resources** — project context, scene summaries, selection state, logs, script errors, play state, project features, MCP interaction history, and file templates
 
 ## Built-in Tools
 
-Funplay MCP for Godot currently ships with **105 registered tool functions** across major workflow groups. The effective exported script tools are filtered by detected project language:
+Funplay MCP for Godot currently ships with **107 registered tool functions** across major workflow groups. The effective exported script tools are filtered by detected project language and per-tool exposure settings:
 
 | Category | Tools |
 |----------|-------|
@@ -207,7 +212,7 @@ Funplay MCP for Godot currently ships with **105 registered tool functions** acr
 | **Camera** | `get_camera_info`, `set_camera_2d`, `set_camera_3d` |
 | **Materials** | `create_material`, `assign_material` |
 | **UI / Control** | `create_ui_root`, `create_control`, `create_label`, `create_button`, `create_panel`, `create_texture_rect`, `create_container`, `set_control_layout`, `set_control_size_flags`, `set_control_text`, `set_control_theme_override`, `set_control_texture`, `connect_node_signal` |
-| **Project / Addons** | `get_project_info`, `list_project_features`, `select_file`, `list_addons`, `set_addon_enabled` |
+| **Project / Addons** | `get_project_info`, `list_project_features`, `get_project_skills_status`, `generate_project_skills`, `select_file`, `list_addons`, `set_addon_enabled` |
 | **Capture / Execution** | `capture_editor_view`, `execute_code` |
 
 ## Repository Layout

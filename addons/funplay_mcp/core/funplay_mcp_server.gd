@@ -5,7 +5,7 @@ const FunplayHttpTransport = preload("res://addons/funplay_mcp/core/funplay_http
 const FunplayMcpRequestHandler = preload("res://addons/funplay_mcp/core/funplay_mcp_request_handler.gd")
 
 const SERVER_NAME = "Funplay MCP Server - Godot"
-const SERVER_VERSION = "0.4.2"
+const SERVER_VERSION = "0.5.0"
 const DEFAULT_PORT = 8765
 const MAX_LOG_ENTRIES = 50
 
@@ -97,14 +97,17 @@ func get_interaction_log() -> Array:
 
 
 func add_interaction(name: String, status: String, message: String) -> void:
-	_interaction_log.push_front({
+	var entry = {
 		"timestamp": Time.get_datetime_string_from_system(true, true),
 		"name": name,
 		"status": status,
 		"message": message,
-	})
+	}
+	_interaction_log.push_front(entry)
 	if _interaction_log.size() > MAX_LOG_ENTRIES:
 		_interaction_log.resize(MAX_LOG_ENTRIES)
+	if _settings != null and _settings.debug_logging_enabled:
+		print("[Funplay MCP] [%s] %s: %s" % [status, name, message])
 
 
 func _handle_http_request(method: String, path: String, body_text: String, headers: Dictionary = {}) -> Dictionary:
@@ -118,6 +121,7 @@ func _handle_http_request(method: String, path: String, body_text: String, heade
 					"version": SERVER_VERSION,
 					"endpoint": get_endpoint(),
 					"tool_profile": _settings.tool_profile,
+					"debug_logging_enabled": _settings.debug_logging_enabled,
 					"protocol_version": _request_handler.get_default_protocol_version(),
 				}),
 			}

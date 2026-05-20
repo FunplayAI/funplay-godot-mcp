@@ -30,6 +30,7 @@ def add_required_file_errors(errors: list[str]) -> None:
         ROOT / "CONTRIBUTING.md",
         PLUGIN_CFG,
         ROOT / "addons" / "funplay_mcp" / "plugin.gd",
+        ROOT / "addons" / "funplay_mcp" / "core" / "funplay_project_skill_manager.gd",
     ]
     for path in required_files:
         if not path.exists():

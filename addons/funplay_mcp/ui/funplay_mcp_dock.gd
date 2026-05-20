@@ -1,9 +1,13 @@
 @tool
 extends VBoxContainer
 
+const FunplayProjectSkillManager = preload("res://addons/funplay_mcp/core/funplay_project_skill_manager.gd")
+
 var _server
 var _settings
 var _client_config_writer
+var _tool_registry
+var _skill_manager = FunplayProjectSkillManager.new()
 
 var _title_label: Label
 var _status_label: Label
@@ -11,19 +15,26 @@ var _endpoint_label: Label
 var _enable_checkbox: CheckBox
 var _port_spinbox: SpinBox
 var _profile_button: OptionButton
+var _debug_checkbox: CheckBox
+var _tool_exposure_label: Label
+var _tool_list: VBoxContainer
 var _client_button: OptionButton
 var _snippet_text: TextEdit
 var _log_text: TextEdit
 var _copy_status_label: Label
 var _config_status_label: Label
 var _config_path_label: Label
+var _skill_status_label: Label
 var _last_refresh_msec: int = 0
+var _last_tool_exposure_signature: String = ""
+var _updating_tool_checks: bool = false
 
 
-func setup(server, settings, client_config_writer) -> void:
+func setup(server, settings, client_config_writer, tool_registry = null) -> void:
 	_server = server
 	_settings = settings
 	_client_config_writer = client_config_writer
+	_tool_registry = tool_registry
 	name = "Funplay MCP"
 	_build_ui()
 	refresh_live_state(true)
@@ -42,15 +53,18 @@ func refresh_live_state(force: bool = false) -> void:
 	_endpoint_label.text = "Endpoint: %s" % (_server.get_endpoint() if _server.is_running() else "http://127.0.0.1:%d/" % _settings.server_port)
 	_enable_checkbox.set_pressed_no_signal(_settings.server_enabled)
 	_port_spinbox.set_value_no_signal(_settings.server_port)
+	_debug_checkbox.set_pressed_no_signal(_settings.debug_logging_enabled)
 
 	if _settings.tool_profile == "core":
 		_profile_button.select(0)
 	else:
 		_profile_button.select(1)
 
+	_refresh_tool_exposure(force)
 	_snippet_text.text = _build_client_snippet(_client_button.get_item_text(_client_button.selected))
 	_log_text.text = _build_log_text()
 	_refresh_config_status()
+	_refresh_skill_status()
 
 
 func _build_ui() -> void:
@@ -100,6 +114,37 @@ func _build_ui() -> void:
 	_profile_button.item_selected.connect(_on_profile_selected)
 	add_child(_profile_button)
 
+	_debug_checkbox = CheckBox.new()
+	_debug_checkbox.text = "Debug Logging"
+	_debug_checkbox.tooltip_text = "Print MCP activity to the Godot output panel."
+	_debug_checkbox.toggled.connect(_on_debug_logging_toggled)
+	add_child(_debug_checkbox)
+
+	var exposure_header = HBoxContainer.new()
+	exposure_header.add_theme_constant_override("separation", 6)
+	add_child(exposure_header)
+
+	_tool_exposure_label = Label.new()
+	_tool_exposure_label.text = "Tool Exposure"
+	_tool_exposure_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	exposure_header.add_child(_tool_exposure_label)
+
+	var reset_tools_button = Button.new()
+	reset_tools_button.text = "Reset"
+	reset_tools_button.tooltip_text = "Expose every tool allowed by the current profile and project language."
+	reset_tools_button.pressed.connect(_reset_tool_exposure)
+	exposure_header.add_child(reset_tools_button)
+
+	var tool_scroll = ScrollContainer.new()
+	tool_scroll.custom_minimum_size = Vector2(0, 160)
+	tool_scroll.size_flags_vertical = Control.SIZE_FILL
+	add_child(tool_scroll)
+
+	_tool_list = VBoxContainer.new()
+	_tool_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_tool_list.add_theme_constant_override("separation", 2)
+	tool_scroll.add_child(_tool_list)
+
 	var client_label = Label.new()
 	client_label.text = "Client Config Snippet"
 	add_child(client_label)
@@ -125,6 +170,12 @@ func _build_ui() -> void:
 	configure_button.pressed.connect(_configure_client)
 	action_row.add_child(configure_button)
 
+	var configure_skills_button = Button.new()
+	configure_skills_button.text = "Configure + Skills"
+	configure_skills_button.tooltip_text = "Write the selected MCP client config and generate project skill files."
+	configure_skills_button.pressed.connect(_configure_client_with_skills)
+	action_row.add_child(configure_skills_button)
+
 	_copy_status_label = Label.new()
 	add_child(_copy_status_label)
 
@@ -134,6 +185,10 @@ func _build_ui() -> void:
 	_config_path_label = Label.new()
 	_config_path_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_config_path_label)
+
+	_skill_status_label = Label.new()
+	_skill_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	add_child(_skill_status_label)
 
 	_snippet_text = TextEdit.new()
 	_snippet_text.custom_minimum_size = Vector2(0, 130)
@@ -171,8 +226,14 @@ func _on_port_changed(value: float) -> void:
 func _on_profile_selected(index: int) -> void:
 	var value: String = "core" if index == 0 else "full"
 	_settings.update_tool_profile(value)
+	_last_tool_exposure_signature = ""
 	if _server.is_running():
 		_server.restart()
+	refresh_live_state(true)
+
+
+func _on_debug_logging_toggled(pressed: bool) -> void:
+	_settings.update_debug_logging_enabled(pressed)
 	refresh_live_state(true)
 
 
@@ -189,6 +250,31 @@ func _configure_client() -> void:
 	var target: Dictionary = _get_selected_target()
 	var result: Dictionary = _client_config_writer.configure_target(target)
 	_copy_status_label.text = result.get("message", "")
+	refresh_live_state(true)
+
+
+func _configure_client_with_skills() -> void:
+	var target: Dictionary = _get_selected_target()
+	var config_result: Dictionary = _client_config_writer.configure_target(target)
+	var skill_result: Dictionary = _skill_manager.generate_project_skills(_get_endpoint(), _settings, _tool_registry)
+	var messages: Array[String] = []
+	messages.append(str(config_result.get("message", "")))
+	messages.append(str(skill_result.get("message", "")))
+	_copy_status_label.text = "\n".join(messages)
+	refresh_live_state(true)
+
+
+func _reset_tool_exposure() -> void:
+	_settings.clear_disabled_tools()
+	_last_tool_exposure_signature = ""
+	refresh_live_state(true)
+
+
+func _on_tool_toggled(pressed: bool, tool_name: String) -> void:
+	if _updating_tool_checks:
+		return
+	_settings.update_tool_disabled(tool_name, not pressed)
+	_last_tool_exposure_signature = ""
 	refresh_live_state(true)
 
 
@@ -214,8 +300,7 @@ func _build_log_text() -> String:
 
 
 func _get_selected_target() -> Dictionary:
-	var endpoint: String = _server.get_endpoint() if _server.is_running() else "http://127.0.0.1:%d/" % _settings.server_port
-	var targets: Array = _client_config_writer.list_targets(endpoint)
+	var targets: Array = _client_config_writer.list_targets(_get_endpoint())
 	var selected_name: String = _client_button.get_item_text(_client_button.selected)
 	for target in targets:
 		if str(target.get("name", "")) == selected_name:
@@ -236,3 +321,75 @@ func _refresh_config_status() -> void:
 	var exists: bool = _client_config_writer.target_exists(target)
 	_config_status_label.text = "Config status: Configured" if exists else "Config status: Not configured"
 	_config_path_label.text = str(target.get("path", ""))
+
+
+func _refresh_skill_status() -> void:
+	if _skill_status_label == null:
+		return
+
+	var status: Dictionary = _skill_manager.get_status()
+	if bool(status.get("skill_exists", false)):
+		_skill_status_label.text = "Project skills: Generated at %s" % str(status.get("skill_path", ""))
+	else:
+		_skill_status_label.text = "Project skills: Not generated"
+
+
+func _refresh_tool_exposure(force: bool) -> void:
+	if _tool_registry == null or _tool_list == null:
+		return
+
+	var summary: Dictionary = _tool_registry.get_exposure_summary(_settings.tool_profile)
+	var signature = "%s:%s" % [
+		str(summary.get("profile", "")),
+		str(summary.get("language_mode", "")) + ":" + ",".join(_settings.disabled_tools),
+	]
+	if not force and signature == _last_tool_exposure_signature:
+		_update_tool_exposure_label(summary)
+		return
+	_last_tool_exposure_signature = signature
+
+	_update_tool_exposure_label(summary)
+	_updating_tool_checks = true
+	for child in _tool_list.get_children():
+		_tool_list.remove_child(child)
+		child.queue_free()
+
+	for tool in summary.get("tools", []):
+		if not (tool is Dictionary):
+			continue
+		var row = HBoxContainer.new()
+		row.add_theme_constant_override("separation", 4)
+		_tool_list.add_child(row)
+
+		var checkbox = CheckBox.new()
+		var tool_name: String = str(tool.get("name", ""))
+		checkbox.text = tool_name
+		checkbox.tooltip_text = str(tool.get("description", ""))
+		checkbox.button_pressed = bool(tool.get("exposed", false))
+		checkbox.disabled = not bool(tool.get("language_allowed", true))
+		checkbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		checkbox.toggled.connect(_on_tool_toggled.bind(tool_name))
+		row.add_child(checkbox)
+
+		if bool(tool.get("disabled", false)):
+			var badge = Label.new()
+			badge.text = "disabled"
+			row.add_child(badge)
+		elif not bool(tool.get("language_allowed", true)):
+			var language_badge = Label.new()
+			language_badge.text = "language"
+			row.add_child(language_badge)
+	_updating_tool_checks = false
+
+
+func _update_tool_exposure_label(summary: Dictionary) -> void:
+	if _tool_exposure_label == null:
+		return
+	_tool_exposure_label.text = "Tool Exposure: %d/%d exposed" % [
+		int(summary.get("exposed", 0)),
+		int(summary.get("total_in_profile", 0)),
+	]
+
+
+func _get_endpoint() -> String:
+	return _server.get_endpoint() if _server.is_running() else "http://127.0.0.1:%d/" % _settings.server_port

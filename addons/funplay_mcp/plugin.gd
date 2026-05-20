@@ -29,7 +29,7 @@ func _enter_tree() -> void:
 	_server = FunplayMcpServer.new(self, _settings, _tool_registry, _resource_provider, _prompt_provider)
 	_client_config_writer = FunplayClientConfigWriter.new()
 	_dock = FunplayMcpDock.new()
-	_dock.setup(_server, _settings, _client_config_writer)
+	_dock.setup(_server, _settings, _client_config_writer, _tool_registry)
 	add_control_to_dock(DOCK_SLOT_RIGHT_UL, _dock)
 
 	if _settings.server_enabled:

@@ -8,6 +8,8 @@ const SETTINGS_PATH = "user://funplay_mcp_settings.cfg"
 var server_enabled: bool = true
 var server_port: int = 8765
 var tool_profile: String = "core"
+var debug_logging_enabled: bool = false
+var disabled_tools: Array[String] = []
 
 
 func _init() -> void:
@@ -23,6 +25,8 @@ func load_settings() -> void:
 	server_enabled = bool(config.get_value("server", "enabled", true))
 	server_port = int(config.get_value("server", "port", 8765))
 	tool_profile = str(config.get_value("server", "tool_profile", "core"))
+	debug_logging_enabled = bool(config.get_value("server", "debug_logging_enabled", false))
+	disabled_tools = _normalize_string_array(config.get_value("tools", "disabled", []))
 
 
 func save_settings() -> void:
@@ -30,6 +34,8 @@ func save_settings() -> void:
 	config.set_value("server", "enabled", server_enabled)
 	config.set_value("server", "port", server_port)
 	config.set_value("server", "tool_profile", tool_profile)
+	config.set_value("server", "debug_logging_enabled", debug_logging_enabled)
+	config.set_value("tools", "disabled", disabled_tools)
 	config.save(SETTINGS_PATH)
 
 
@@ -57,3 +63,56 @@ func update_tool_profile(value: String) -> void:
 	tool_profile = normalized
 	save_settings()
 	settings_changed.emit()
+
+
+func update_debug_logging_enabled(value: bool) -> void:
+	if debug_logging_enabled == value:
+		return
+	debug_logging_enabled = value
+	save_settings()
+	settings_changed.emit()
+
+
+func is_tool_disabled(tool_name: String) -> bool:
+	return tool_name in disabled_tools
+
+
+func update_tool_disabled(tool_name: String, disabled: bool) -> void:
+	var normalized = tool_name.strip_edges()
+	if normalized == "":
+		return
+
+	var changed = false
+	if disabled:
+		if not (normalized in disabled_tools):
+			disabled_tools.append(normalized)
+			changed = true
+	else:
+		var index = disabled_tools.find(normalized)
+		if index >= 0:
+			disabled_tools.remove_at(index)
+			changed = true
+
+	if changed:
+		disabled_tools.sort()
+		save_settings()
+		settings_changed.emit()
+
+
+func clear_disabled_tools() -> void:
+	if disabled_tools.is_empty():
+		return
+	disabled_tools.clear()
+	save_settings()
+	settings_changed.emit()
+
+
+func _normalize_string_array(value) -> Array[String]:
+	var results: Array[String] = []
+	if value is Array:
+		for item in value:
+			var text = str(item).strip_edges()
+			if text != "" and not (text in results):
+				results.append(text)
+	results.sort()
+	return results

@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0] - 2026-05-20
+
+### Added
+- Added a Dock Tool Exposure panel for enabling or disabling individual tools within the active profile
+- Added Project Skills generation, including `Configure + Skills`, generated skill files, an `AGENTS.md` bridge, and MCP tools for skill status/generation
+- Added optional MCP debug logging from the Dock
+- Added `execute_code` context helpers for logging, object summaries, manual change tracking, and metadata-wrapped results
+
+### Changed
+- Tool call responses now mirror JSON text results into MCP `structuredContent`
+- Node and resource summaries now include session `instance_id` values, and node lookup accepts `id:<instance_id>` identifiers
+
 ## [0.4.2] - 2026-05-11
 
 ### Added
