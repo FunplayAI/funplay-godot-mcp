@@ -25,6 +25,7 @@ func _enter_tree() -> void:
 	_settings = FunplayMcpSettings.new()
 	_tool_registry = FunplayToolRegistry.new(self, _settings)
 	_resource_provider = FunplayResourceProvider.new(self, _settings)
+	_resource_provider.set_tool_registry(_tool_registry)
 	_prompt_provider = FunplayPromptProvider.new(self, _settings)
 	_server = FunplayMcpServer.new(self, _settings, _tool_registry, _resource_provider, _prompt_provider)
 	_client_config_writer = FunplayClientConfigWriter.new()

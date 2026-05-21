@@ -38,6 +38,9 @@ const SIZE_FLAG_MAP = {
 	"shrink_center": 4,
 	"shrink_end": 8,
 }
+const RUNTIME_BRIDGE_AUTOLOAD_NAME = "FunplayMcpRuntimeBridge"
+const RUNTIME_BRIDGE_SCRIPT_PATH = "res://addons/funplay_mcp/runtime/funplay_mcp_runtime_bridge.gd"
+const RUNTIME_BRIDGE_STATE_PATH = "user://funplay_mcp_runtime_bridge.json"
 
 class ExecutionContext:
 	extends RefCounted
@@ -1283,7 +1286,7 @@ func rename_node(arguments: Dictionary) -> String:
 	if node == null:
 		return "Error: Node not found: %s" % node_path
 
-	node.name = new_name
+	_commit_undoable_properties(node, {"name": new_name}, "Rename Node", bool(arguments.get("undoable", true)))
 	return _render_variant({
 		"node": _node_to_summary(node),
 	})
@@ -1334,7 +1337,7 @@ func set_node_property(arguments: Dictionary) -> String:
 	if node == null:
 		return "Error: Node not found: %s" % node_path
 
-	node.set(property_name, arguments.get("value"))
+	_commit_undoable_properties(node, {property_name: arguments.get("value")}, "Set Node Property", bool(arguments.get("undoable", true)))
 	return _render_variant({
 		"node": _node_to_summary(node),
 		"property": property_name,
@@ -1354,8 +1357,10 @@ func set_node_properties(arguments: Dictionary) -> String:
 	if node == null:
 		return "Error: Node not found: %s" % node_path
 
+	var changes: Dictionary = {}
 	for key in properties.keys():
-		node.set(str(key), properties[key])
+		changes[str(key)] = properties[key]
+	_commit_undoable_properties(node, changes, "Set Node Properties", bool(arguments.get("undoable", true)))
 
 	return _render_variant({
 		"node": _node_to_summary(node),
@@ -1373,21 +1378,25 @@ func set_transform_2d(arguments: Dictionary) -> String:
 		return "Error: Node not found: %s" % node_path
 
 	if node is Node2D:
+		var changes_2d: Dictionary = {}
 		if arguments.has("position"):
-			node.position = _to_vector2(arguments.get("position"))
+			changes_2d["position"] = _to_vector2(arguments.get("position"))
 		if arguments.has("rotation_degrees"):
-			node.rotation_degrees = float(arguments.get("rotation_degrees"))
+			changes_2d["rotation_degrees"] = float(arguments.get("rotation_degrees"))
 		if arguments.has("scale"):
-			node.scale = _to_vector2(arguments.get("scale"))
+			changes_2d["scale"] = _to_vector2(arguments.get("scale"))
+		_commit_undoable_properties(node, changes_2d, "Set 2D Transform", bool(arguments.get("undoable", true)))
 	elif node is Control:
+		var changes_control: Dictionary = {}
 		if arguments.has("position"):
-			node.position = _to_vector2(arguments.get("position"))
+			changes_control["position"] = _to_vector2(arguments.get("position"))
 		if arguments.has("rotation_degrees"):
-			node.rotation_degrees = float(arguments.get("rotation_degrees"))
+			changes_control["rotation_degrees"] = float(arguments.get("rotation_degrees"))
 		if arguments.has("scale"):
-			node.scale = _to_vector2(arguments.get("scale"))
+			changes_control["scale"] = _to_vector2(arguments.get("scale"))
 		if arguments.has("size"):
-			node.size = _to_vector2(arguments.get("size"))
+			changes_control["size"] = _to_vector2(arguments.get("size"))
+		_commit_undoable_properties(node, changes_control, "Set Control Transform", bool(arguments.get("undoable", true)))
 	else:
 		return "Error: Node '%s' is not a Node2D or Control." % node_path
 
@@ -1407,12 +1416,14 @@ func set_transform_3d(arguments: Dictionary) -> String:
 	if not (node is Node3D):
 		return "Error: Node '%s' is not a Node3D." % node_path
 
+	var changes: Dictionary = {}
 	if arguments.has("position"):
-		node.position = _to_vector3(arguments.get("position"))
+		changes["position"] = _to_vector3(arguments.get("position"))
 	if arguments.has("rotation_degrees"):
-		node.rotation_degrees = _to_vector3(arguments.get("rotation_degrees"))
+		changes["rotation_degrees"] = _to_vector3(arguments.get("rotation_degrees"))
 	if arguments.has("scale"):
-		node.scale = _to_vector3(arguments.get("scale"))
+		changes["scale"] = _to_vector3(arguments.get("scale"))
+	_commit_undoable_properties(node, changes, "Set 3D Transform", bool(arguments.get("undoable", true)))
 
 	return _render_variant({
 		"node": _build_node_info(node),
@@ -1618,28 +1629,30 @@ func set_control_layout(arguments: Dictionary) -> String:
 
 	if arguments.has("layout_preset"):
 		_apply_layout_preset(control, str(arguments.get("layout_preset")))
+	var changes: Dictionary = {}
 	if arguments.has("anchors"):
 		var anchors = arguments.get("anchors")
 		if anchors is Dictionary:
-			control.anchor_left = float(anchors.get("left", control.anchor_left))
-			control.anchor_top = float(anchors.get("top", control.anchor_top))
-			control.anchor_right = float(anchors.get("right", control.anchor_right))
-			control.anchor_bottom = float(anchors.get("bottom", control.anchor_bottom))
+			changes["anchor_left"] = float(anchors.get("left", control.anchor_left))
+			changes["anchor_top"] = float(anchors.get("top", control.anchor_top))
+			changes["anchor_right"] = float(anchors.get("right", control.anchor_right))
+			changes["anchor_bottom"] = float(anchors.get("bottom", control.anchor_bottom))
 	if arguments.has("offsets"):
 		var offsets = arguments.get("offsets")
 		if offsets is Dictionary:
-			control.offset_left = float(offsets.get("left", control.offset_left))
-			control.offset_top = float(offsets.get("top", control.offset_top))
-			control.offset_right = float(offsets.get("right", control.offset_right))
-			control.offset_bottom = float(offsets.get("bottom", control.offset_bottom))
+			changes["offset_left"] = float(offsets.get("left", control.offset_left))
+			changes["offset_top"] = float(offsets.get("top", control.offset_top))
+			changes["offset_right"] = float(offsets.get("right", control.offset_right))
+			changes["offset_bottom"] = float(offsets.get("bottom", control.offset_bottom))
 	if arguments.has("size"):
-		control.size = _to_vector2(arguments.get("size"))
+		changes["size"] = _to_vector2(arguments.get("size"))
 	if arguments.has("position"):
-		control.position = _to_vector2(arguments.get("position"))
+		changes["position"] = _to_vector2(arguments.get("position"))
 	if arguments.has("grow_horizontal"):
-		control.grow_horizontal = int(arguments.get("grow_horizontal"))
+		changes["grow_horizontal"] = int(arguments.get("grow_horizontal"))
 	if arguments.has("grow_vertical"):
-		control.grow_vertical = int(arguments.get("grow_vertical"))
+		changes["grow_vertical"] = int(arguments.get("grow_vertical"))
+	_commit_undoable_properties(control, changes, "Set Control Layout", bool(arguments.get("undoable", true)))
 
 	return _render_variant({
 		"control": _build_control_info(control),
@@ -1651,12 +1664,14 @@ func set_control_size_flags(arguments: Dictionary) -> String:
 	if control == null:
 		return "Error: Control not found."
 
+	var changes: Dictionary = {}
 	if arguments.has("horizontal"):
-		control.size_flags_horizontal = _parse_size_flags(arguments.get("horizontal"))
+		changes["size_flags_horizontal"] = _parse_size_flags(arguments.get("horizontal"))
 	if arguments.has("vertical"):
-		control.size_flags_vertical = _parse_size_flags(arguments.get("vertical"))
+		changes["size_flags_vertical"] = _parse_size_flags(arguments.get("vertical"))
 	if arguments.has("stretch_ratio"):
-		control.size_flags_stretch_ratio = float(arguments.get("stretch_ratio"))
+		changes["size_flags_stretch_ratio"] = float(arguments.get("stretch_ratio"))
+	_commit_undoable_properties(control, changes, "Set Control Size Flags", bool(arguments.get("undoable", true)))
 
 	return _render_variant({
 		"control": _build_control_info(control),
@@ -1676,7 +1691,7 @@ func set_control_text(arguments: Dictionary) -> String:
 	if not _has_property(control, property_name):
 		return "Error: Control '%s' does not expose property '%s'." % [control.name, property_name]
 
-	control.set(property_name, text)
+	_commit_undoable_properties(control, {property_name: text}, "Set Control Text", bool(arguments.get("undoable", true)))
 	return _render_variant({
 		"control": _build_control_info(control),
 		"property": property_name,
@@ -2624,6 +2639,206 @@ func generate_project_skills(arguments: Dictionary) -> String:
 	return _render_variant(manager.generate_project_skills(endpoint, _settings, _tool_registry, include_agents_bridge))
 
 
+func list_tool_catalog(arguments: Dictionary) -> String:
+	if _tool_registry == null or not _tool_registry.has_method("get_tool_catalog"):
+		return "Error: Tool registry is not available."
+	var profile: String = str(arguments.get("profile", _settings.tool_profile if _settings != null else "core"))
+	var group: String = str(arguments.get("group", "")).strip_edges()
+	var include_hidden: bool = bool(arguments.get("include_hidden", true))
+	return _render_variant(_tool_registry.get_tool_catalog(profile, group, include_hidden))
+
+
+func funplay_help(arguments: Dictionary) -> String:
+	var topic: String = str(arguments.get("topic", "overview")).strip_edges().to_lower()
+	var profile: String = _settings.tool_profile if _settings != null else "core"
+	var catalog: Dictionary = _tool_registry.get_tool_catalog(profile, "", false) if _tool_registry != null and _tool_registry.has_method("get_tool_catalog") else {}
+	var topics: Dictionary = {
+		"overview": {
+			"title": "Funplay MCP workflow overview",
+			"steps": [
+				"Read godot://project/context or call get_project_info before broad edits.",
+				"Use funplay_help with a topic when choosing a workflow.",
+				"Use execute_code for multi-step editor orchestration, then focused tools for common edits.",
+				"Use save_scene, get_script_errors, logs, and play-mode checks before finishing.",
+			],
+		},
+		"scene": {
+			"title": "Scene editing workflow",
+			"steps": [
+				"Call get_scene_tree and get_selection to establish the current scene shape.",
+				"Use create_node, instantiate_scene, set_node_property, and set_transform_2d/3d in the full profile.",
+				"Use editor_undo/editor_redo if an undoable operation needs to be reverted.",
+				"Call save_scene after persistent scene changes.",
+			],
+		},
+		"runtime": {
+			"title": "Runtime validation workflow",
+			"steps": [
+				"Install the runtime bridge if you need game-side heartbeat state during play mode.",
+				"Enter play mode, simulate input, then inspect get_runtime_bridge_status, get_console_logs, and get_performance_snapshot.",
+				"Use assertion tools for quick validation of edited scene state.",
+			],
+		},
+		"scripts": {
+			"title": "Script workflow",
+			"steps": [
+				"Use list_scripts or search_files to find the script.",
+				"Read the file, patch or edit it, then validate_script or get_script_errors.",
+				"Use get_editor_protocol_status to inspect Godot LSP/DAP editor settings when IDE integration looks stale.",
+			],
+		},
+		"ui": {
+			"title": "Godot Control UI workflow",
+			"steps": [
+				"Use ui_layout_plan prompt or get_scene_tree to plan placement.",
+				"Create a UI root, add controls/containers, apply layout presets, then set text/theme/texture overrides.",
+				"Capture the editor view or run play-mode checks to verify the UI.",
+			],
+		},
+	}
+	var selected: Dictionary = topics.get(topic, topics["overview"])
+	return _render_variant({
+		"topic": topic,
+		"available_topics": topics.keys(),
+		"profile": profile,
+		"catalog_summary": {
+			"group_count": int(catalog.get("group_count", 0)),
+			"tool_count": int(catalog.get("tool_count", 0)),
+		},
+		"help": selected,
+	})
+
+
+func get_capability_status(_arguments: Dictionary) -> String:
+	var editor = _editor()
+	var scene_root = editor.get_edited_scene_root()
+	var language_mode: String = detect_script_language_mode()
+	var undo_redo = _get_editor_undo_redo()
+	var protocol_status: Dictionary = _build_editor_protocol_status()
+	var runtime_status: Dictionary = _build_runtime_bridge_status()
+	return _render_variant({
+		"project": {
+			"name": str(ProjectSettings.get_setting("application/config/name", "")),
+			"root": ProjectSettings.globalize_path("res://"),
+			"main_scene": str(ProjectSettings.get_setting("application/run/main_scene", "")),
+			"language_mode": language_mode,
+		},
+		"capabilities": {
+			"mcp_server": true,
+			"tool_registry": _tool_registry != null,
+			"resources": true,
+			"prompts": true,
+			"scene_open": scene_root != null,
+			"play_mode": editor.has_method("is_playing_scene"),
+			"dotnet": language_mode == "dotnet" or language_mode == "mixed",
+			"lsp_settings": protocol_status.get("language_server", {}).get("setting_count", 0) > 0,
+			"dap_settings": protocol_status.get("debug_adapter", {}).get("setting_count", 0) > 0,
+			"undo_redo": undo_redo != null,
+			"runtime_bridge_installed": bool(runtime_status.get("installed", false)),
+			"runtime_bridge_state_seen": bool(runtime_status.get("state_exists", false)),
+		},
+		"tool_profile": _settings.tool_profile if _settings != null else "core",
+		"disabled_tool_count": _settings.disabled_tools.size() if _settings != null else 0,
+	})
+
+
+func get_editor_protocol_status(_arguments: Dictionary) -> String:
+	return _render_variant(_build_editor_protocol_status())
+
+
+func get_undo_redo_status(_arguments: Dictionary) -> String:
+	var undo_redo = _get_editor_undo_redo()
+	return _render_variant({
+		"available": undo_redo != null,
+		"methods": {
+			"undo": undo_redo != null and undo_redo.has_method("undo"),
+			"redo": undo_redo != null and undo_redo.has_method("redo"),
+			"create_action": undo_redo != null and undo_redo.has_method("create_action"),
+			"commit_action": undo_redo != null and undo_redo.has_method("commit_action"),
+		},
+	})
+
+
+func editor_undo(_arguments: Dictionary) -> String:
+	var undo_redo = _get_editor_undo_redo()
+	if undo_redo == null or not undo_redo.has_method("undo"):
+		return "Error: Editor undo is not available in this Godot version."
+	undo_redo.undo()
+	return _render_variant({"ok": true, "action": "undo"})
+
+
+func editor_redo(_arguments: Dictionary) -> String:
+	var undo_redo = _get_editor_undo_redo()
+	if undo_redo == null or not undo_redo.has_method("redo"):
+		return "Error: Editor redo is not available in this Godot version."
+	undo_redo.redo()
+	return _render_variant({"ok": true, "action": "redo"})
+
+
+func install_runtime_bridge(arguments: Dictionary) -> String:
+	if not FileAccess.file_exists(RUNTIME_BRIDGE_SCRIPT_PATH):
+		return "Error: Runtime bridge script is missing: %s" % RUNTIME_BRIDGE_SCRIPT_PATH
+	var autoload_name: String = str(arguments.get("autoload_name", RUNTIME_BRIDGE_AUTOLOAD_NAME)).strip_edges()
+	if autoload_name == "":
+		return "Error: 'autoload_name' cannot be empty."
+	var key: String = "autoload/%s" % autoload_name
+	var value: String = str(arguments.get("value", "*%s" % RUNTIME_BRIDGE_SCRIPT_PATH))
+	ProjectSettings.set_setting(key, value)
+	var save_changes: bool = bool(arguments.get("save", true))
+	if save_changes:
+		ProjectSettings.save()
+	return _render_variant({
+		"installed": true,
+		"autoload_name": autoload_name,
+		"key": key,
+		"value": value,
+		"state_path": RUNTIME_BRIDGE_STATE_PATH,
+		"saved": save_changes,
+	})
+
+
+func remove_runtime_bridge(arguments: Dictionary) -> String:
+	var autoload_name: String = str(arguments.get("autoload_name", RUNTIME_BRIDGE_AUTOLOAD_NAME)).strip_edges()
+	if autoload_name == "":
+		return "Error: 'autoload_name' cannot be empty."
+	var key: String = "autoload/%s" % autoload_name
+	if ProjectSettings.has_setting(key):
+		ProjectSettings.set_setting(key, null)
+	var save_changes: bool = bool(arguments.get("save", true))
+	if save_changes:
+		ProjectSettings.save()
+	return _render_variant({
+		"installed": false,
+		"autoload_name": autoload_name,
+		"key": key,
+		"saved": save_changes,
+	})
+
+
+func get_runtime_bridge_status(_arguments: Dictionary) -> String:
+	return _render_variant(_build_runtime_bridge_status())
+
+
+func list_workflow_coverage(_arguments: Dictionary) -> String:
+	var profile: String = _settings.tool_profile if _settings != null else "core"
+	var catalog: Dictionary = _tool_registry.get_tool_catalog(profile, "", false) if _tool_registry != null and _tool_registry.has_method("get_tool_catalog") else {}
+	var exposed_tools: Array = []
+	for tool in catalog.get("tools", []):
+		if tool is Dictionary:
+			exposed_tools.append(str(tool.get("name", "")))
+	return _render_variant({
+		"profile": profile,
+		"coverage": [
+			_build_coverage_item("Project orientation", ["get_project_info", "get_scene_tree", "list_tool_catalog", "funplay_help"], exposed_tools),
+			_build_coverage_item("Scene and node editing", ["create_node", "set_node_property", "set_transform_2d", "save_scene", "editor_undo"], exposed_tools),
+			_build_coverage_item("Script editing and diagnostics", ["read_file", "patch_script", "validate_script", "get_script_errors", "get_editor_protocol_status"], exposed_tools),
+			_build_coverage_item("Runtime validation", ["enter_play_mode", "simulate_action", "get_runtime_bridge_status", "get_console_logs"], exposed_tools),
+			_build_coverage_item("UI authoring", ["create_ui_root", "create_control", "set_control_layout", "set_control_text"], exposed_tools),
+			_build_coverage_item("Project configuration", ["list_project_settings", "set_project_setting", "list_input_actions", "list_autoloads"], exposed_tools),
+		],
+	})
+
+
 func _build_execute_code_context(execution_context: ExecutionContext) -> Dictionary:
 	var editor = _editor()
 	return {
@@ -2697,6 +2912,130 @@ func _collect_scene_nodes_by_id(node: Node, results: Dictionary) -> void:
 
 func _editor():
 	return _plugin.get_editor_interface()
+
+
+func _get_editor_settings():
+	var editor = _editor()
+	if editor != null and editor.has_method("get_editor_settings"):
+		return editor.get_editor_settings()
+	return null
+
+
+func _get_editor_undo_redo():
+	var editor = _editor()
+	if editor != null and editor.has_method("get_editor_undo_redo"):
+		return editor.get_editor_undo_redo()
+	return null
+
+
+func _commit_undoable_properties(object: Object, changes: Dictionary, action_name: String, undoable: bool = true) -> void:
+	if object == null or changes.is_empty():
+		return
+
+	var undo_redo = _get_editor_undo_redo()
+	var can_use_undo: bool = undoable and undo_redo != null
+	can_use_undo = can_use_undo and undo_redo.has_method("create_action")
+	can_use_undo = can_use_undo and undo_redo.has_method("add_do_property")
+	can_use_undo = can_use_undo and undo_redo.has_method("add_undo_property")
+	can_use_undo = can_use_undo and undo_redo.has_method("commit_action")
+	if not can_use_undo:
+		for property_name in changes.keys():
+			object.set(str(property_name), changes[property_name])
+		return
+
+	undo_redo.create_action(action_name)
+	for property_name in changes.keys():
+		var key: String = str(property_name)
+		undo_redo.add_do_property(object, key, changes[property_name])
+		undo_redo.add_undo_property(object, key, object.get(key))
+	undo_redo.commit_action()
+
+
+func _build_editor_protocol_status() -> Dictionary:
+	var editor_settings = _get_editor_settings()
+	var language_server_keys: Array[String] = [
+		"network/language_server/remote_host",
+		"network/language_server/remote_port",
+		"network/language_server/use_thread",
+		"network/language_server/show_native_symbols_in_editor",
+		"network/language_server/show_warning_icon",
+	]
+	var debug_adapter_keys: Array[String] = [
+		"network/debug_adapter/remote_host",
+		"network/debug_adapter/remote_port",
+		"network/debug_adapter/request_timeout",
+		"network/debug_adapter/sync_breakpoints",
+	]
+	return {
+		"language_server": _collect_editor_setting_values(editor_settings, language_server_keys),
+		"debug_adapter": _collect_editor_setting_values(editor_settings, debug_adapter_keys),
+		"script_language_mode": detect_script_language_mode(),
+		"notes": [
+			"This reports Godot editor protocol settings exposed through EditorSettings.",
+			"Use the configured LSP/DAP host and port from your external editor if your client needs direct protocol connections.",
+		],
+	}
+
+
+func _collect_editor_setting_values(editor_settings, keys: Array[String]) -> Dictionary:
+	var values: Dictionary = {}
+	var missing: Array[String] = []
+	if editor_settings == null:
+		return {
+			"available": false,
+			"setting_count": 0,
+			"values": values,
+			"missing": keys,
+		}
+	for key in keys:
+		var has_key: bool = editor_settings.has_method("has_setting") and editor_settings.has_setting(key)
+		if has_key:
+			values[key] = _json_safe(editor_settings.get_setting(key))
+		else:
+			missing.append(key)
+	return {
+		"available": not values.is_empty(),
+		"setting_count": values.size(),
+		"values": values,
+		"missing": missing,
+	}
+
+
+func _build_runtime_bridge_status() -> Dictionary:
+	var key: String = "autoload/%s" % RUNTIME_BRIDGE_AUTOLOAD_NAME
+	var state_exists: bool = FileAccess.file_exists(RUNTIME_BRIDGE_STATE_PATH)
+	var state = {}
+	if state_exists:
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string(RUNTIME_BRIDGE_STATE_PATH))
+		if parsed is Dictionary:
+			state = parsed
+	return {
+		"installed": ProjectSettings.has_setting(key),
+		"autoload_name": RUNTIME_BRIDGE_AUTOLOAD_NAME,
+		"autoload_key": key,
+		"autoload_value": str(ProjectSettings.get_setting(key, "")) if ProjectSettings.has_setting(key) else "",
+		"script_exists": FileAccess.file_exists(RUNTIME_BRIDGE_SCRIPT_PATH),
+		"script_path": RUNTIME_BRIDGE_SCRIPT_PATH,
+		"state_exists": state_exists,
+		"state_path": RUNTIME_BRIDGE_STATE_PATH,
+		"state": state,
+	}
+
+
+func _build_coverage_item(name: String, tools: Array, exposed_tools: Array) -> Dictionary:
+	var available: Array = []
+	var missing: Array = []
+	for tool_name in tools:
+		if str(tool_name) in exposed_tools:
+			available.append(tool_name)
+		else:
+			missing.append(tool_name)
+	return {
+		"name": name,
+		"available": available,
+		"missing": missing,
+		"coverage": float(available.size()) / float(max(tools.size(), 1)),
+	}
 
 
 func _build_scene_info(scene_root: Node) -> Dictionary:

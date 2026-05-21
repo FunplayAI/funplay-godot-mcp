@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0] - 2026-05-21
+
+### Added
+- Added grouped tool catalog and `funplay_help` workflow guidance tools
+- Added capability status, LSP/DAP editor protocol status, workflow coverage, and matching resources
+- Added runtime bridge autoload script plus install/remove/status MCP tools for play-mode heartbeat state
+- Added editor undo/redo status and command tools backed by Godot `EditorUndoRedoManager` when available
+
 ## [0.5.0] - 2026-05-20
 
 ### Added

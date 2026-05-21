@@ -5,6 +5,7 @@ const FunplayCoreTools = preload("res://addons/funplay_mcp/core/funplay_core_too
 
 var _plugin
 var _settings
+var _tool_registry
 var _core_tools
 var _interaction_log_getter: Callable
 
@@ -17,6 +18,12 @@ func _init(plugin, settings) -> void:
 
 func set_interaction_log_getter(getter: Callable) -> void:
 	_interaction_log_getter = getter
+
+
+func set_tool_registry(tool_registry) -> void:
+	_tool_registry = tool_registry
+	if _core_tools != null and _core_tools.has_method("set_tool_registry"):
+		_core_tools.set_tool_registry(tool_registry)
 
 
 func list_resources() -> Array:
@@ -49,6 +56,30 @@ func list_resources() -> Array:
 			"uri": "godot://project/skills",
 			"name": "Project Skills",
 			"description": "Generated Funplay project skill status and file paths.",
+			"mimeType": "application/json",
+		},
+		{
+			"uri": "godot://tools/catalog",
+			"name": "Tool Catalog",
+			"description": "Grouped tool catalog with exposure status and schemas.",
+			"mimeType": "application/json",
+		},
+		{
+			"uri": "godot://capabilities/status",
+			"name": "Capability Status",
+			"description": "Detected editor, project, protocol, undo/redo, and runtime bridge capabilities.",
+			"mimeType": "application/json",
+		},
+		{
+			"uri": "godot://runtime/bridge",
+			"name": "Runtime Bridge",
+			"description": "Runtime bridge install status and latest play-mode heartbeat state.",
+			"mimeType": "application/json",
+		},
+		{
+			"uri": "godot://workflow/coverage",
+			"name": "Workflow Coverage",
+			"description": "Coverage matrix for high-value Funplay MCP Godot workflows.",
 			"mimeType": "application/json",
 		},
 		{
@@ -145,6 +176,14 @@ func read_resource(uri: String) -> Dictionary:
 		return _content_response(uri, JSON.stringify(_get_interaction_log(), "\t"), "application/json")
 	if uri == "godot://project/skills":
 		return _content_response(uri, _core_tools.get_project_skills_status({}), "application/json")
+	if uri == "godot://tools/catalog":
+		return _content_response(uri, _core_tools.list_tool_catalog({"include_hidden": true}), "application/json")
+	if uri == "godot://capabilities/status":
+		return _content_response(uri, _core_tools.get_capability_status({}), "application/json")
+	if uri == "godot://runtime/bridge":
+		return _content_response(uri, _core_tools.get_runtime_bridge_status({}), "application/json")
+	if uri == "godot://workflow/coverage":
+		return _content_response(uri, _core_tools.list_workflow_coverage({}), "application/json")
 	if uri == "godot://logs/recent":
 		return _content_response(uri, _core_tools.get_console_logs({}), "application/json")
 	if uri == "godot://scripts/errors":

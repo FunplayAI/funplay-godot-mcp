@@ -155,6 +155,8 @@ Open your AI client and try: *"Create a 2D HUD with health bar, score label, and
 - **`execute_code` First** — The addon is optimized around one high-flexibility GDScript execution tool for rich editor/runtime orchestration when many small tools would be noisy
 - **Tool Exposure Control** — Toggle individual tools from the Godot dock without editing addon code or restarting the project
 - **Project Skills** — Generate project-local AI guidance files that capture the current endpoint, tool profile, project context, and recommended Funplay workflow
+- **Tool Catalog & Help** — Query grouped tool catalogs, capability gates, workflow coverage, and task-specific guidance from MCP
+- **Runtime Bridge** — Optionally install a lightweight autoload that writes play-mode heartbeat state for AI-driven runtime validation
 - **Play Mode Automation** — Enter play mode, simulate input, inspect logs, capture editor views, and validate behavior from the same MCP session
 - **Project Context Built In** — Exposes live resources for project state, active scene, selection, play state, script errors, logs, and MCP interaction history
 - **Focused by Default, Full When Needed** — `core` exposes a compact high-signal toolset; `full` exposes a broader editor automation surface
@@ -163,7 +165,7 @@ Open your AI client and try: *"Create a 2D HUD with health bar, score label, and
 
 ## Highlights
 
-- **107 Built-in Tools** — Scene editing, PackedScene workflows, language-aware script tools, project settings, input map, autoloads, runtime assertions, files, project skills, play mode control, UI controls, animation, camera, performance, resources, prompts, and editor automation
+- **118 Built-in Tools** — Scene editing, PackedScene workflows, language-aware script tools, project settings, input map, autoloads, runtime bridge, undo/redo, workflow guidance, files, project skills, play mode control, UI controls, animation, camera, performance, resources, prompts, and editor automation
 - **Resources & Prompts** — Live project context, scene/selection/error resources, language-aware script diagnostics, `.NET` project resources when applicable, resource templates, and reusable workflow prompts
 - **Structured Results** — JSON tool outputs are mirrored into MCP `structuredContent`, and node/resource summaries include session `instance_id` values for follow-up calls
 - **Input Simulation + View Capture** — Drive play mode with action/key/mouse simulation and verify results with captured editor views
@@ -189,14 +191,14 @@ The table below compares this repository with the public behavior and positionin
 
 The current open-source package exposes four high-value capability layers:
 
-- **Tools** — 107 total registered tools across scene editing, scripts, project configuration, input map, autoloads, runtime assertions, files, project skills, UI, animation, camera, diagnostics, and automation. Script-related tools are filtered by detected project language and the dock's Tool Exposure settings.
+- **Tools** — 118 total registered tools across scene editing, scripts, project configuration, input map, autoloads, runtime bridge, undo/redo, workflow guidance, files, project skills, UI, animation, camera, diagnostics, and automation. Script-related tools are filtered by detected project language and the dock's Tool Exposure settings.
 - **Primary execution** — `execute_code` for rich editor/runtime orchestration, with optional object-style context helpers, logs, and change tracking metadata
 - **Prompts** — workflow prompts like `scene_review`, `feature_plan`, `runtime_debug`, `script_patch`, and `ui_layout_plan`
 - **Resources** — project context, scene summaries, selection state, logs, script errors, play state, project features, MCP interaction history, and file templates
 
 ## Built-in Tools
 
-Funplay MCP for Godot currently ships with **107 registered tool functions** across major workflow groups. The effective exported script tools are filtered by detected project language and per-tool exposure settings:
+Funplay MCP for Godot currently ships with **118 registered tool functions** across major workflow groups. The effective exported script tools are filtered by detected project language and per-tool exposure settings:
 
 | Category | Tools |
 |----------|-------|
@@ -205,6 +207,8 @@ Funplay MCP for Godot currently ships with **107 registered tool functions** acr
 | **Node Reflection** | `list_node_properties`, `list_node_signals`, `list_node_methods` |
 | **Scripts** | `create_script`, `list_scripts`, `edit_script`, `patch_script`, `open_script`, `validate_script`, `get_script_errors`, `request_script_reload`; `.NET` projects also expose `get_dotnet_project_info` |
 | **Project Settings / Input / Autoload** | `list_project_settings`, `get_project_setting`, `set_project_setting`, `list_input_actions`, `get_input_action`, `add_input_action`, `remove_input_action`, `add_input_event_to_action`, `clear_input_events`, `list_autoloads`, `set_autoload`, `remove_autoload` |
+| **Guidance / Capability** | `funplay_help`, `list_tool_catalog`, `get_capability_status`, `get_editor_protocol_status`, `list_workflow_coverage` |
+| **Runtime Bridge / Undo** | `install_runtime_bridge`, `remove_runtime_bridge`, `get_runtime_bridge_status`, `get_undo_redo_status`, `editor_undo`, `editor_redo` |
 | **Files** | `read_file`, `write_file`, `search_files`, `list_files`, `file_exists`, `delete_file`, `move_file`, `copy_file` |
 | **Play / Input** | `get_play_state`, `enter_play_mode`, `play_main_scene`, `exit_play_mode`, `simulate_action`, `simulate_key_event`, `simulate_mouse_button`, `simulate_mouse_drag`, `simulate_input_sequence`, `get_time_scale`, `set_time_scale` |
 | **Assertions / Diagnostics** | `assert_node_exists`, `assert_node_property`, `assert_signal_connected`, `wait_msec`, `get_performance_snapshot`, `analyze_scene_complexity`, `get_console_logs`, `log_message` |

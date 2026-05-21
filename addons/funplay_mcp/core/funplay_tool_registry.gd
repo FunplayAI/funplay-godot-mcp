@@ -115,6 +115,66 @@ func get_exposure_summary(profile: String) -> Dictionary:
 	}
 
 
+func get_tool_catalog(profile: String, group_filter: String = "", include_hidden: bool = true) -> Dictionary:
+	var selected_profile: String = profile if profile in _profiles else "core"
+	var language_mode: String = _core_tools.detect_script_language_mode()
+	var groups: Dictionary = {}
+	var tools: Array = []
+	for tool_name in _profiles[selected_profile]:
+		if not _tools.has(tool_name):
+			continue
+
+		var tool_data: Dictionary = _tools[tool_name]
+		var group_name: String = str(tool_data.get("group", "other"))
+		if group_filter.strip_edges() != "" and group_name != group_filter:
+			continue
+
+		var language_modes: Array = tool_data.get("language_modes", ["universal"])
+		var language_allowed: bool = "universal" in language_modes or language_mode in language_modes
+		var disabled: bool = _settings != null and _settings.has_method("is_tool_disabled") and _settings.is_tool_disabled(tool_name)
+		var exposed: bool = language_allowed and not disabled
+		if not include_hidden and not exposed:
+			continue
+
+		var definition: Dictionary = tool_data.get("definition", {})
+		var entry: Dictionary = {
+			"name": tool_name,
+			"group": group_name,
+			"description": str(definition.get("description", "")),
+			"inputSchema": definition.get("inputSchema", {}),
+			"profiles": _get_tool_profiles(tool_name),
+			"language_modes": language_modes,
+			"exposed": exposed,
+			"hidden_reason": _tool_hidden_reason(language_allowed, disabled),
+		}
+		tools.append(entry)
+		if not groups.has(group_name):
+			groups[group_name] = {
+				"name": group_name,
+				"description": _group_description(group_name),
+				"tools": [],
+			}
+		groups[group_name]["tools"].append(tool_name)
+
+	var sorted_groups: Array = []
+	for group_name in groups.keys():
+		var group_entry: Dictionary = groups[group_name]
+		group_entry["tool_count"] = group_entry["tools"].size()
+		sorted_groups.append(group_entry)
+	sorted_groups.sort_custom(func(a, b): return str(a.get("name", "")) < str(b.get("name", "")))
+
+	return {
+		"profile": selected_profile,
+		"language_mode": language_mode,
+		"group_filter": group_filter,
+		"include_hidden": include_hidden,
+		"group_count": sorted_groups.size(),
+		"tool_count": tools.size(),
+		"groups": sorted_groups,
+		"tools": tools,
+	}
+
+
 func _register_tools() -> void:
 	_register_tool("execute_code", "Primary high-flexibility Godot editor execution tool. Runs a GDScript snippet inside run(ctx), with context helpers, logs, and change tracking.", {
 		"type": "object",
@@ -360,6 +420,42 @@ func _register_tools() -> void:
 		},
 		"required": ["message"],
 	}, "log_message", ["core", "full"])
+	_register_tool("list_tool_catalog", "Return a grouped tool catalog with profiles, exposure, schemas, and hidden reasons.", {
+		"type": "object",
+		"properties": {
+			"profile": {"type": "string", "enum": ["core", "full"]},
+			"group": {"type": "string"},
+			"include_hidden": {"type": "boolean", "default": true},
+		},
+	}, "list_tool_catalog", ["core", "full"])
+	_register_tool("funplay_help", "Return workflow help for common Funplay MCP tasks and tool-selection guidance.", {
+		"type": "object",
+		"properties": {
+			"topic": {"type": "string", "enum": ["overview", "scene", "runtime", "scripts", "ui"], "default": "overview"},
+		},
+	}, "funplay_help", ["core", "full"])
+	_register_tool("get_capability_status", "Return detected project, editor, protocol, undo/redo, and runtime bridge capability gates.", _empty_schema(), "get_capability_status", ["core", "full"])
+	_register_tool("get_editor_protocol_status", "Return Godot editor LSP and debug-adapter settings discovered from EditorSettings.", _empty_schema(), "get_editor_protocol_status", ["core", "full"])
+	_register_tool("get_undo_redo_status", "Return availability of the Godot EditorUndoRedoManager bridge.", _empty_schema(), "get_undo_redo_status", ["core", "full"])
+	_register_tool("editor_undo", "Run one editor undo step through EditorUndoRedoManager when available.", _empty_schema(), "editor_undo", ["core", "full"])
+	_register_tool("editor_redo", "Run one editor redo step through EditorUndoRedoManager when available.", _empty_schema(), "editor_redo", ["core", "full"])
+	_register_tool("install_runtime_bridge", "Install the Funplay runtime bridge autoload for play-mode heartbeat state.", {
+		"type": "object",
+		"properties": {
+			"autoload_name": {"type": "string", "default": "FunplayMcpRuntimeBridge"},
+			"value": {"type": "string"},
+			"save": {"type": "boolean", "default": true},
+		},
+	}, "install_runtime_bridge", ["core", "full"])
+	_register_tool("remove_runtime_bridge", "Remove the Funplay runtime bridge autoload from ProjectSettings.", {
+		"type": "object",
+		"properties": {
+			"autoload_name": {"type": "string", "default": "FunplayMcpRuntimeBridge"},
+			"save": {"type": "boolean", "default": true},
+		},
+	}, "remove_runtime_bridge", ["core", "full"])
+	_register_tool("get_runtime_bridge_status", "Return runtime bridge install status and the latest play-mode heartbeat state.", _empty_schema(), "get_runtime_bridge_status", ["core", "full"])
+	_register_tool("list_workflow_coverage", "Return a compact workflow coverage matrix for high-value Godot MCP workflows.", _empty_schema(), "list_workflow_coverage", ["core", "full"])
 	_register_tool("get_project_skills_status", "Return whether Funplay project skill files have been generated.", _empty_schema(), "get_project_skills_status", ["core", "full"])
 	_register_tool("generate_project_skills", "Generate Funplay project skill files and an optional AGENTS.md bridge for AI clients.", {
 		"type": "object",
@@ -605,6 +701,7 @@ func _register_tools() -> void:
 		"properties": {
 			"node_path": {"type": "string"},
 			"new_name": {"type": "string"},
+			"undoable": {"type": "boolean", "default": true},
 		},
 		"required": ["node_path", "new_name"],
 	}, "rename_node", ["full"])
@@ -623,6 +720,7 @@ func _register_tools() -> void:
 			"node_path": {"type": "string"},
 			"property": {"type": "string"},
 			"value": {},
+			"undoable": {"type": "boolean", "default": true},
 		},
 		"required": ["node_path", "property", "value"],
 	}, "set_node_property", ["full"])
@@ -631,6 +729,7 @@ func _register_tools() -> void:
 		"properties": {
 			"node_path": {"type": "string"},
 			"properties": {"type": "object"},
+			"undoable": {"type": "boolean", "default": true},
 		},
 		"required": ["node_path", "properties"],
 	}, "set_node_properties", ["full"])
@@ -642,6 +741,7 @@ func _register_tools() -> void:
 			"rotation_degrees": {"type": "number"},
 			"scale": {},
 			"size": {},
+			"undoable": {"type": "boolean", "default": true},
 		},
 		"required": ["node_path"],
 	}, "set_transform_2d", ["full"])
@@ -652,6 +752,7 @@ func _register_tools() -> void:
 			"position": {},
 			"rotation_degrees": {},
 			"scale": {},
+			"undoable": {"type": "boolean", "default": true},
 		},
 		"required": ["node_path"],
 	}, "set_transform_3d", ["full"])
@@ -877,6 +978,7 @@ func _register_tools() -> void:
 			"size": {},
 			"grow_horizontal": {"type": "integer"},
 			"grow_vertical": {"type": "integer"},
+			"undoable": {"type": "boolean", "default": true},
 		},
 		"required": ["node_path"],
 	}, "set_control_layout", ["full"])
@@ -887,6 +989,7 @@ func _register_tools() -> void:
 			"horizontal": {},
 			"vertical": {},
 			"stretch_ratio": {"type": "number"},
+			"undoable": {"type": "boolean", "default": true},
 		},
 		"required": ["node_path"],
 	}, "set_control_size_flags", ["full"])
@@ -896,6 +999,7 @@ func _register_tools() -> void:
 			"node_path": {"type": "string"},
 			"property": {"type": "string", "default": "text"},
 			"text": {"type": "string"},
+			"undoable": {"type": "boolean", "default": true},
 		},
 		"required": ["node_path", "text"],
 	}, "set_control_text", ["full"])
@@ -972,6 +1076,7 @@ func _register_tool(name: String, description: String, input_schema: Dictionary,
 		},
 		"handler": Callable(_core_tools, method_name),
 		"language_modes": language_modes,
+		"group": _infer_tool_group(name),
 	}
 
 	for profile_name in profiles:
@@ -987,6 +1092,96 @@ func _get_tool_profiles(tool_name: String) -> Array:
 			profiles.append(profile_name)
 	profiles.sort()
 	return profiles
+
+
+func _tool_hidden_reason(language_allowed: bool, disabled: bool) -> String:
+	if disabled:
+		return "disabled_by_tool_exposure"
+	if not language_allowed:
+		return "hidden_by_project_language"
+	return ""
+
+
+func _infer_tool_group(tool_name: String) -> String:
+	if tool_name in ["execute_code", "capture_editor_view", "log_message", "wait_msec"]:
+		return "execution"
+	if tool_name in ["funplay_help", "list_tool_catalog", "get_capability_status", "list_workflow_coverage"]:
+		return "guidance"
+	if tool_name in ["get_editor_protocol_status", "get_script_errors", "validate_script", "request_script_reload", "get_console_logs", "get_performance_snapshot", "analyze_scene_complexity"]:
+		return "diagnostics"
+	if tool_name in ["get_project_info", "list_project_features", "list_project_settings", "get_project_setting", "set_project_setting", "get_project_skills_status", "generate_project_skills"]:
+		return "project"
+	if tool_name in ["list_input_actions", "get_input_action", "add_input_action", "remove_input_action", "add_input_event_to_action", "clear_input_events"]:
+		return "input"
+	if tool_name in ["list_autoloads", "set_autoload", "remove_autoload", "install_runtime_bridge", "remove_runtime_bridge", "get_runtime_bridge_status"]:
+		return "runtime"
+	if tool_name in ["editor_undo", "editor_redo", "get_undo_redo_status"]:
+		return "undo_redo"
+	if tool_name in ["list_scenes", "open_scene", "save_scene", "save_scene_as", "create_new_scene", "instantiate_scene", "create_packed_scene_from_node", "get_packed_scene_info"]:
+		return "scene"
+	if tool_name in ["get_scene_info", "get_scene_tree", "get_selection", "get_node_info", "find_nodes", "select_node", "create_node", "duplicate_node", "rename_node", "reparent_node", "remove_node", "set_node_property", "set_node_properties", "set_transform_2d", "set_transform_3d", "set_node_script", "list_node_properties", "list_node_signals", "list_node_methods"]:
+		return "nodes"
+	if tool_name in ["create_script", "list_scripts", "get_dotnet_project_info", "edit_script", "patch_script", "open_script"]:
+		return "scripts"
+	if tool_name in ["get_play_state", "enter_play_mode", "play_main_scene", "exit_play_mode", "simulate_action", "simulate_key_event", "simulate_mouse_button", "simulate_mouse_drag", "simulate_input_sequence", "get_time_scale", "set_time_scale"]:
+		return "play"
+	if tool_name in ["assert_node_exists", "assert_node_property", "assert_signal_connected"]:
+		return "assertions"
+	if tool_name in ["create_animation_player", "create_animation_clip", "add_animation_track", "list_animations", "play_animation"]:
+		return "animation"
+	if tool_name in ["get_camera_info", "set_camera_2d", "set_camera_3d"]:
+		return "camera"
+	if tool_name in ["create_material", "assign_material"]:
+		return "materials"
+	if tool_name in ["create_ui_root", "create_control", "create_label", "create_button", "create_panel", "create_texture_rect", "create_container", "set_control_layout", "set_control_size_flags", "set_control_text", "set_control_theme_override", "set_control_texture", "connect_node_signal"]:
+		return "ui"
+	if tool_name in ["list_files", "search_files", "file_exists", "read_file", "write_file", "delete_file", "move_file", "copy_file", "select_file"]:
+		return "files"
+	if tool_name in ["list_addons", "set_addon_enabled"]:
+		return "addons"
+	return "other"
+
+
+func _group_description(group_name: String) -> String:
+	match group_name:
+		"guidance":
+			return "Help, tool catalog, capability status, and workflow coverage."
+		"execution":
+			return "Primary execution, capture, logging, and stabilization tools."
+		"diagnostics":
+			return "Script, log, performance, LSP/DAP, and scene diagnostic tools."
+		"project":
+			return "Project settings, feature summaries, and Project Skills."
+		"input":
+			return "InputMap inspection and editing."
+		"runtime":
+			return "Autoloads, play-state context, and runtime bridge support."
+		"undo_redo":
+			return "Editor undo and redo status/commands."
+		"scene":
+			return "Scene file creation, opening, saving, instancing, and PackedScene workflows."
+		"nodes":
+			return "Node inspection, selection, mutation, transforms, and reflection."
+		"scripts":
+			return "GDScript and .NET script creation, editing, and navigation."
+		"play":
+			return "Play mode, input simulation, and time-scale control."
+		"assertions":
+			return "Runtime/editor assertions for validation flows."
+		"animation":
+			return "AnimationPlayer, animation clips, tracks, and playback."
+		"camera":
+			return "Camera2D and Camera3D inspection and configuration."
+		"materials":
+			return "Material creation and assignment."
+		"ui":
+			return "Godot Control and CanvasLayer UI authoring."
+		"files":
+			return "Project file listing, search, read/write, and file operations."
+		"addons":
+			return "Addon listing and plugin enable/disable support."
+		_:
+			return "Miscellaneous tools."
 
 
 func _empty_schema() -> Dictionary:
