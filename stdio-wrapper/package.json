@@ -6,7 +6,7 @@
   "type": "module",
   "mcpName": "io.github.FunplayAI/funplay-godot-mcp",
   "bin": {
-    "funplay-godot-mcp": "./bin/funplay-godot-mcp.js"
+    "funplay-godot-mcp": "bin/funplay-godot-mcp.js"
   },
   "files": [
     "bin",
@@ -24,7 +24,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/FunplayAI/funplay-godot-mcp.git",
+    "url": "git+https://github.com/FunplayAI/funplay-godot-mcp.git",
     "directory": "stdio-wrapper"
   }
 }

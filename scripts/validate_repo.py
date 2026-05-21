@@ -154,7 +154,7 @@ def add_registry_metadata_errors(errors: list[str], server_version: str) -> None
         errors.append(f"stdio-wrapper package version {wrapper_data.get('version')} does not match {server_version}")
 
     bin_map = wrapper_data.get("bin", {})
-    if not isinstance(bin_map, dict) or bin_map.get("funplay-godot-mcp") != "./bin/funplay-godot-mcp.js":
+    if not isinstance(bin_map, dict) or bin_map.get("funplay-godot-mcp") != "bin/funplay-godot-mcp.js":
         errors.append("stdio-wrapper package bin should expose funplay-godot-mcp")
 
 
