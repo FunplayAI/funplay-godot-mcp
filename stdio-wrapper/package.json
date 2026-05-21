@@ -1,0 +1,30 @@
+{
+  "name": "funplay-godot-mcp",
+  "version": "0.7.0",
+  "description": "stdio bridge for the local Funplay MCP for Godot editor addon.",
+  "license": "MIT",
+  "type": "module",
+  "mcpName": "io.github.FunplayAI/funplay-godot-mcp",
+  "bin": {
+    "funplay-godot-mcp": "./bin/funplay-godot-mcp.js"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "package.json"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "godot",
+    "mcp",
+    "model-context-protocol",
+    "funplay"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FunplayAI/funplay-godot-mcp.git",
+    "directory": "stdio-wrapper"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.FunplayAI/funplay-godot-mcp",
+  "title": "Funplay Godot MCP",
+  "description": "stdio bridge for the local Godot Editor MCP server from FunplayAI/funplay-godot-mcp.",
+  "repository": {
+    "url": "https://github.com/FunplayAI/funplay-godot-mcp",
+    "source": "github"
+  },
+  "version": "0.7.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "funplay-godot-mcp",
+      "version": "0.7.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "FUNPLAY_GODOT_MCP_URL",
+          "description": "Optional Godot MCP HTTP endpoint. Defaults to http://127.0.0.1:8765/.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "GODOT_MCP_URL",
+          "description": "Compatibility endpoint variable used when FUNPLAY_GODOT_MCP_URL is not set.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

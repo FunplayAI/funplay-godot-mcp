@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0] - 2026-05-21
+
+### Added
+- Added release packaging automation that builds a validated `Funplay.GodotMcp.vX.Y.Z.zip`, release manifest, release notes, and SHA256 sums
+- Added a tag-driven GitHub Release workflow that uploads the generated release artifacts
+- Added a Dock update checker that queries the latest GitHub Release and opens the release page
+- Added an npm-ready stdio wrapper plus MCP Registry `server.json` metadata for `io.github.FunplayAI/funplay-godot-mcp`
+
 ## [0.6.0] - 2026-05-21
 
 ### Added

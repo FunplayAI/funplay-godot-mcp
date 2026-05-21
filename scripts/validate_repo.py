@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import configparser
+import json
 import pathlib
 import re
 import sys
@@ -15,6 +16,9 @@ SERVER = ROOT / "addons" / "funplay_mcp" / "core" / "funplay_mcp_server.gd"
 REQUEST_HANDLER = ROOT / "addons" / "funplay_mcp" / "core" / "funplay_mcp_request_handler.gd"
 TOOL_REGISTRY = ROOT / "addons" / "funplay_mcp" / "core" / "funplay_tool_registry.gd"
 CORE_TOOLS = ROOT / "addons" / "funplay_mcp" / "core" / "funplay_core_tools.gd"
+SERVER_JSON = ROOT / "server.json"
+WRAPPER_PACKAGE_JSON = ROOT / "stdio-wrapper" / "package.json"
+WRAPPER_BIN = ROOT / "stdio-wrapper" / "bin" / "funplay-godot-mcp.js"
 
 
 def read_text(path: pathlib.Path) -> str:
@@ -28,10 +32,18 @@ def add_required_file_errors(errors: list[str]) -> None:
         ROOT / "LICENSE",
         ROOT / "CHANGELOG.md",
         ROOT / "CONTRIBUTING.md",
+        ROOT / "RELEASE_CHECKLIST.md",
         PLUGIN_CFG,
         ROOT / "addons" / "funplay_mcp" / "plugin.gd",
         ROOT / "addons" / "funplay_mcp" / "core" / "funplay_project_skill_manager.gd",
+        ROOT / "addons" / "funplay_mcp" / "core" / "funplay_update_checker.gd",
         ROOT / "addons" / "funplay_mcp" / "runtime" / "funplay_mcp_runtime_bridge.gd",
+        ROOT / "scripts" / "package_release.py",
+        ROOT / ".github" / "workflows" / "release.yml",
+        SERVER_JSON,
+        WRAPPER_PACKAGE_JSON,
+        WRAPPER_BIN,
+        ROOT / "stdio-wrapper" / "README.md",
     ]
     for path in required_files:
         if not path.exists():
@@ -91,6 +103,59 @@ def add_version_errors(errors: list[str], plugin_version: str) -> None:
     changelog = read_text(ROOT / "CHANGELOG.md") if (ROOT / "CHANGELOG.md").exists() else ""
     if server_version and f"## [{server_version}]" not in changelog:
         errors.append(f"CHANGELOG.md does not include a release section for {server_version}")
+
+    add_registry_metadata_errors(errors, server_version)
+
+
+def add_registry_metadata_errors(errors: list[str], server_version: str) -> None:
+    if not SERVER_JSON.exists() or not WRAPPER_PACKAGE_JSON.exists():
+        return
+
+    try:
+        server_data = json.loads(read_text(SERVER_JSON))
+    except Exception as exc:
+        errors.append(f"server.json is not valid JSON: {exc}")
+        return
+
+    expected_name = "io.github.FunplayAI/funplay-godot-mcp"
+    if server_data.get("name") != expected_name:
+        errors.append(f"server.json name should be {expected_name}")
+    if server_version and server_data.get("version") != server_version:
+        errors.append(f"server.json version {server_data.get('version')} does not match {server_version}")
+
+    packages = server_data.get("packages", [])
+    if not isinstance(packages, list) or len(packages) != 1:
+        errors.append("server.json should contain exactly one package entry")
+        packages = []
+
+    if packages:
+        package = packages[0]
+        if package.get("registryType") != "npm":
+            errors.append("server.json package registryType should be npm")
+        if package.get("identifier") != "funplay-godot-mcp":
+            errors.append("server.json package identifier should be funplay-godot-mcp")
+        if server_version and package.get("version") != server_version:
+            errors.append(f"server.json package version {package.get('version')} does not match {server_version}")
+        transport = package.get("transport", {})
+        if not isinstance(transport, dict) or transport.get("type") != "stdio":
+            errors.append("server.json package transport type should be stdio")
+
+    try:
+        wrapper_data = json.loads(read_text(WRAPPER_PACKAGE_JSON))
+    except Exception as exc:
+        errors.append(f"stdio-wrapper/package.json is not valid JSON: {exc}")
+        return
+
+    if wrapper_data.get("name") != "funplay-godot-mcp":
+        errors.append("stdio-wrapper package name should be funplay-godot-mcp")
+    if wrapper_data.get("mcpName") != expected_name:
+        errors.append("stdio-wrapper package mcpName must match server.json name")
+    if server_version and wrapper_data.get("version") != server_version:
+        errors.append(f"stdio-wrapper package version {wrapper_data.get('version')} does not match {server_version}")
+
+    bin_map = wrapper_data.get("bin", {})
+    if not isinstance(bin_map, dict) or bin_map.get("funplay-godot-mcp") != "./bin/funplay-godot-mcp.js":
+        errors.append("stdio-wrapper package bin should expose funplay-godot-mcp")
 
 
 def add_protocol_errors(errors: list[str]) -> None:

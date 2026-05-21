@@ -2,14 +2,20 @@
 extends VBoxContainer
 
 const FunplayProjectSkillManager = preload("res://addons/funplay_mcp/core/funplay_project_skill_manager.gd")
+const FunplayUpdateChecker = preload("res://addons/funplay_mcp/core/funplay_update_checker.gd")
 
 var _server
 var _settings
 var _client_config_writer
 var _tool_registry
 var _skill_manager = FunplayProjectSkillManager.new()
+var _update_checker = FunplayUpdateChecker.new()
 
 var _title_label: Label
+var _version_label: Label
+var _update_status_label: Label
+var _check_updates_button: Button
+var _open_release_button: Button
 var _status_label: Label
 var _endpoint_label: Label
 var _enable_checkbox: CheckBox
@@ -37,6 +43,9 @@ func setup(server, settings, client_config_writer, tool_registry = null) -> void
 	_tool_registry = tool_registry
 	name = "Funplay MCP"
 	_build_ui()
+	_update_checker.setup(self)
+	if not _update_checker.state_changed.is_connected(_on_update_state_changed):
+		_update_checker.state_changed.connect(_on_update_state_changed)
 	refresh_live_state(true)
 
 
@@ -65,6 +74,7 @@ func refresh_live_state(force: bool = false) -> void:
 	_log_text.text = _build_log_text()
 	_refresh_config_status()
 	_refresh_skill_status()
+	_refresh_update_state()
 
 
 func _build_ui() -> void:
@@ -76,10 +86,38 @@ func _build_ui() -> void:
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_theme_constant_override("separation", 8)
 
+	var title_row = HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 8)
+	add_child(title_row)
+
 	_title_label = Label.new()
 	_title_label.text = "Funplay MCP"
 	_title_label.add_theme_font_size_override("font_size", 18)
-	add_child(_title_label)
+	_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(_title_label)
+
+	_version_label = Label.new()
+	_version_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	title_row.add_child(_version_label)
+
+	var update_row = HBoxContainer.new()
+	update_row.add_theme_constant_override("separation", 6)
+	add_child(update_row)
+
+	_update_status_label = Label.new()
+	_update_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_update_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	update_row.add_child(_update_status_label)
+
+	_check_updates_button = Button.new()
+	_check_updates_button.text = "Check Updates"
+	_check_updates_button.pressed.connect(_check_for_updates)
+	update_row.add_child(_check_updates_button)
+
+	_open_release_button = Button.new()
+	_open_release_button.text = "Open Release"
+	_open_release_button.pressed.connect(_open_latest_release)
+	update_row.add_child(_open_release_button)
 
 	_status_label = Label.new()
 	add_child(_status_label)
@@ -270,6 +308,19 @@ func _reset_tool_exposure() -> void:
 	refresh_live_state(true)
 
 
+func _check_for_updates() -> void:
+	_update_checker.check_for_updates()
+	_refresh_update_state()
+
+
+func _open_latest_release() -> void:
+	_update_checker.open_latest_release()
+
+
+func _on_update_state_changed() -> void:
+	_refresh_update_state()
+
+
 func _on_tool_toggled(pressed: bool, tool_name: String) -> void:
 	if _updating_tool_checks:
 		return
@@ -334,6 +385,18 @@ func _refresh_skill_status() -> void:
 		_skill_status_label.text = "Project skills: Not generated"
 
 
+func _refresh_update_state() -> void:
+	if _version_label == null or _update_status_label == null:
+		return
+
+	var state: Dictionary = _update_checker.get_state()
+	_version_label.text = "v%s" % str(state.get("current_version", "0.0.0"))
+	_update_status_label.text = str(state.get("status_message", "Updates: Not checked"))
+	_check_updates_button.disabled = bool(state.get("is_checking", false))
+	_check_updates_button.text = "Checking..." if bool(state.get("is_checking", false)) else "Check Updates"
+	_open_release_button.disabled = bool(state.get("is_checking", false))
+
+
 func _refresh_tool_exposure(force: bool) -> void:
 	if _tool_registry == null or _tool_list == null:
 		return
@@ -393,3 +456,8 @@ func _update_tool_exposure_label(summary: Dictionary) -> void:
 
 func _get_endpoint() -> String:
 	return _server.get_endpoint() if _server.is_running() else "http://127.0.0.1:%d/" % _settings.server_port
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and _update_checker != null:
+		_update_checker.teardown()

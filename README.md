@@ -43,6 +43,7 @@ If you just want to get connected fast, do these three things:
 
 You can either:
 
+- download `Funplay.GodotMcp.vX.Y.Z.zip` from the latest GitHub Release and extract it into your project root,
 - clone this repository and open it directly as a Godot project, or
 - copy `addons/funplay_mcp` into your own Godot `res://addons/` directory
 
@@ -58,6 +59,7 @@ In Godot:
 
 The server starts on `http://127.0.0.1:8765/` by default.
 If that port is already occupied, it automatically picks another free local port and saves it to `user://funplay_mcp_settings.cfg`.
+The dock also shows the installed addon version and includes a **Check Updates** action that opens the latest GitHub Release when a newer version is available.
 
 ### 3. Configure Your AI Client
 
@@ -126,6 +128,33 @@ url = "http://127.0.0.1:8765/"
 
 </details>
 
+### Optional stdio wrapper
+
+Most clients can connect directly to the addon over HTTP. For clients or registries that prefer stdio packages, this repository also includes an npm-ready wrapper under `stdio-wrapper/`.
+
+```bash
+cd stdio-wrapper
+npm link
+FUNPLAY_GODOT_MCP_URL=http://127.0.0.1:8765/ funplay-godot-mcp
+```
+
+After the wrapper is published to npm, replace `npm link` with `npm install -g funplay-godot-mcp`.
+
+Example MCP client entry:
+
+```json
+{
+  "mcpServers": {
+    "funplay": {
+      "command": "funplay-godot-mcp",
+      "env": {
+        "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/"
+      }
+    }
+  }
+}
+```
+
 ### 4. Verify the Connection
 
 Open your AI client and try a few safe requests first:
@@ -147,6 +176,7 @@ Open your AI client and try: *"Create a 2D HUD with health bar, score label, and
 - Local MCP server settings are stored in `user://funplay_mcp_settings.cfg`.
 - The addon defaults to the `core` MCP tool profile to reduce tool-list noise for AI clients. Switch to `full` in the dock if you want the complete tool surface.
 - The dock includes a Tool Exposure panel for disabling individual tools within the active profile, plus an optional debug logging toggle for MCP activity.
+- The dock can check GitHub Releases for newer addon versions.
 - All exposed MCP tools run directly. There is no extra approval toggle inside the addon.
 - The built-in dock can copy or write recommended MCP config entries for Codex, Claude Code, Cursor, and VS Code.
 
@@ -170,6 +200,7 @@ Open your AI client and try: *"Create a 2D HUD with health bar, score label, and
 - **Structured Results** — JSON tool outputs are mirrored into MCP `structuredContent`, and node/resource summaries include session `instance_id` values for follow-up calls
 - **Input Simulation + View Capture** — Drive play mode with action/key/mouse simulation and verify results with captured editor views
 - **One-Click Client Configuration** — Generate MCP config entries for Codex, Claude Code, Cursor, and VS Code directly from the Godot dock
+- **Release + Registry Ready** — GitHub Release artifacts are generated with manifests and SHA256 sums, and the npm stdio wrapper is described by `server.json` for MCP Registry publication
 - **UI/Control Tooling** — Build CanvasLayer and Control hierarchies, set layouts, apply theme overrides, wire signals, and create HUDs through MCP
 - **Vendor Agnostic** — Works with any AI client that supports MCP: Claude Code, Cursor, Windsurf, Codex, VS Code Copilot, etc.
 
@@ -224,6 +255,9 @@ Funplay MCP for Godot currently ships with **118 registered tool functions** acr
 - `addons/funplay_mcp/plugin.gd` — Godot editor plugin entry
 - `addons/funplay_mcp/core/` — MCP server, tools, resources, prompts, settings, and config writers
 - `addons/funplay_mcp/ui/` — Godot dock UI
+- `stdio-wrapper/` — npm stdio bridge for clients that cannot connect to HTTP MCP directly
+- `server.json` — MCP Registry metadata for the stdio wrapper
+- `scripts/package_release.py` — release artifact builder and package validator
 - `CHANGELOG.md` — user-facing changes
 - `CONTRIBUTING.md` — contributor workflow
 - `RELEASE_CHECKLIST.md` — release process
