@@ -35,6 +35,12 @@ func list_resources() -> Array:
 			"mimeType": "application/json",
 		},
 		{
+			"uri": "godot://project/map",
+			"name": "Project Map",
+			"description": "Lightweight scene, script, dependency, signal, function, and graph map.",
+			"mimeType": "application/json",
+		},
+		{
 			"uri": "godot://scene/current",
 			"name": "Current Scene",
 			"description": "Structured view of the currently edited scene tree.",
@@ -56,6 +62,12 @@ func list_resources() -> Array:
 			"uri": "godot://project/skills",
 			"name": "Project Skills",
 			"description": "Generated Funplay project skill status and file paths.",
+			"mimeType": "application/json",
+		},
+		{
+			"uri": "godot://templates/catalog",
+			"name": "Template Catalog",
+			"description": "Bundled prompt/resource templates for UI, networking, performance, architecture, assets, and update safety.",
 			"mimeType": "application/json",
 		},
 		{
@@ -162,12 +174,20 @@ func list_resource_templates() -> Array:
 			"description": "Read a scene file from res:// by relative path.",
 			"mimeType": "text/plain",
 		},
+		{
+			"uriTemplate": "godot://templates/{name}",
+			"name": "Implementation Template",
+			"description": "Read a bundled implementation template by name.",
+			"mimeType": "text/markdown",
+		},
 	]
 
 
 func read_resource(uri: String) -> Dictionary:
 	if uri == "godot://project/context":
 		return _content_response(uri, _core_tools.get_project_info({}), "application/json")
+	if uri == "godot://project/map":
+		return _content_response(uri, _core_tools.map_project({"format": "json", "max_files": 300, "max_script_members": 60}), "application/json")
 	if uri == "godot://scene/current":
 		return _content_response(uri, _core_tools.get_scene_tree({}), "application/json")
 	if uri == "godot://selection/current":
@@ -176,6 +196,8 @@ func read_resource(uri: String) -> Dictionary:
 		return _content_response(uri, JSON.stringify(_get_interaction_log(), "\t"), "application/json")
 	if uri == "godot://project/skills":
 		return _content_response(uri, _core_tools.get_project_skills_status({}), "application/json")
+	if uri == "godot://templates/catalog":
+		return _content_response(uri, JSON.stringify(_template_catalog(), "\t"), "application/json")
 	if uri == "godot://tools/catalog":
 		return _content_response(uri, _core_tools.list_tool_catalog({"include_hidden": true}), "application/json")
 	if uri == "godot://capabilities/status":
@@ -210,6 +232,9 @@ func read_resource(uri: String) -> Dictionary:
 	if uri.begins_with("godot://scene/file/"):
 		var scene_relative_path: String = uri.trim_prefix("godot://scene/file/")
 		return _content_response(uri, _read_project_file(scene_relative_path), "text/plain")
+	if uri.begins_with("godot://templates/"):
+		var template_name: String = uri.trim_prefix("godot://templates/").strip_edges().to_lower()
+		return _content_response(uri, _template_markdown(template_name), "text/markdown")
 
 	return {
 		"contents": [{
@@ -251,3 +276,110 @@ func _read_project_file(relative_path: String) -> String:
 		return "Error: Failed to open file: %s" % path
 
 	return file.get_as_text()
+
+
+func _template_catalog() -> Array:
+	return [
+		{
+			"name": "ui_screen",
+			"description": "Control tree, layout, theme, and validation checklist for a UI screen or HUD.",
+		},
+		{
+			"name": "network_system",
+			"description": "Autoload, message schema, connection lifecycle, and test plan for Godot networking.",
+		},
+		{
+			"name": "performance_review",
+			"description": "Evidence-first performance review template using counters, logs, scene complexity, and project map.",
+		},
+		{
+			"name": "architecture_review",
+			"description": "Scene/script ownership, dependency, autoload, and migration review template.",
+		},
+		{
+			"name": "asset_pipeline",
+			"description": "Optional CC0 asset search/download workflow with license capture and safe import paths.",
+		},
+		{
+			"name": "release_update_safety",
+			"description": "Release package checksum and updater allowlist design notes.",
+		},
+	]
+
+
+func _template_markdown(name: String) -> String:
+	match name:
+		"ui_screen":
+			return "\n".join([
+				"# UI Screen Template",
+				"",
+				"Use this for HUDs, menus, popups, inspectors, and tool panels.",
+				"",
+				"1. Define the user flow and primary state.",
+				"2. Create a CanvasLayer or root Control with named containers.",
+				"3. Use anchors, containers, size flags, and theme overrides instead of absolute positioning.",
+				"4. Connect signals through named methods and verify with get_scene_tree plus UI-specific tool calls.",
+				"5. Add responsive checks for long text, small viewport, focus order, and disabled/loading states.",
+			])
+		"network_system":
+			return "\n".join([
+				"# Network System Template",
+				"",
+				"Use this for multiplayer, WebSocket, HTTP, relay, or backend-backed gameplay.",
+				"",
+				"1. Put connection lifecycle in one autoload, not scattered scene scripts.",
+				"2. Define message dictionaries with version, type, request_id, payload, and error fields.",
+				"3. Separate transport, serialization, gameplay handlers, and retry/backoff policy.",
+				"4. Add editor-testable fake transport hooks before wiring live services.",
+				"5. Validate connect, disconnect, timeout, malformed message, and scene transition behavior.",
+			])
+		"performance_review":
+			return "\n".join([
+				"# Performance Review Template",
+				"",
+				"Use this when frame time, memory, scene load, draw calls, physics, or script hot paths are suspicious.",
+				"",
+				"1. Capture performance counters, recent logs, script errors, scene complexity, and project map.",
+				"2. Separate measured facts from hypotheses.",
+				"3. Rank fixes by expected impact and implementation risk.",
+				"4. Prefer scene/node count, resource loading, physics tick, signal churn, and allocation checks before broad rewrites.",
+				"5. Re-run the same measurement after each fix.",
+			])
+		"architecture_review":
+			return "\n".join([
+				"# Architecture Review Template",
+				"",
+				"Use this to clean up scene boundaries, script ownership, dependency direction, and project conventions.",
+				"",
+				"1. Start from map_project and find large scenes, highly reused scripts, and dependency cycles.",
+				"2. Assign ownership for gameplay, UI, persistence, networking, and editor-only code.",
+				"3. Keep autoloads small and stable; move feature logic back into scenes/resources where possible.",
+				"4. Create migration slices that keep existing scenes loadable.",
+				"5. Validate with scene open/save, script errors, play-state smoke tests, and find_usages.",
+			])
+		"asset_pipeline":
+			return "\n".join([
+				"# Asset Pipeline Template",
+				"",
+				"Use this for optional CC0 or permissive asset discovery and import workflows.",
+				"",
+				"1. Search approved sources only after the user asks for network asset lookup.",
+				"2. Capture source URL, license, author/pack name, checksum, and download time.",
+				"3. Import under res://assets/imported/<source>/<pack>/ and never overwrite existing project files by default.",
+				"4. Store attribution and license metadata next to imported files.",
+				"5. Trigger filesystem scan, then return imported paths and suggested usage steps.",
+			])
+		"release_update_safety":
+			return "\n".join([
+				"# Release Update Safety Template",
+				"",
+				"Use this before adding automatic update or package import flows.",
+				"",
+				"1. Verify release artifact checksums before unpacking or installing.",
+				"2. Allow writes only under res://addons/funplay_mcp/ unless a future installer explicitly asks for broader scope.",
+				"3. Reject absolute paths, parent-directory traversal, symlinks, hidden local metadata, and host project config writes.",
+				"4. Dry-run the file list and report added, changed, and skipped paths before writing.",
+				"5. Keep manual install as the fallback when safety checks fail.",
+			])
+		_:
+			return "Error: Unknown template '%s'. Read godot://templates/catalog for available names." % name

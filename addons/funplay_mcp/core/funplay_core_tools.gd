@@ -300,6 +300,132 @@ func get_selection(_arguments: Dictionary) -> String:
 	return _render_variant(nodes)
 
 
+func map_project(arguments: Dictionary) -> String:
+	var output_format: String = str(arguments.get("format", "json")).strip_edges().to_lower()
+	if not (output_format in ["json", "html"]):
+		return "Error: 'format' must be 'json' or 'html'."
+
+	var include_scripts: bool = bool(arguments.get("include_scripts", true))
+	var include_graph: bool = bool(arguments.get("include_graph", true))
+	var max_files: int = int(clamp(int(arguments.get("max_files", 300)), 10, 2000))
+	var max_script_members: int = int(clamp(int(arguments.get("max_script_members", 80)), 5, 500))
+	var editor = _editor()
+	var scene_paths: Array = []
+	_collect_matching_files("res://", true, max_files, scene_paths, SCENE_EXTENSIONS)
+	scene_paths.sort()
+
+	var scenes: Array = []
+	var referenced_scripts: Array = []
+	for scene_path in scene_paths:
+		var scene_summary: Dictionary = _summarize_scene_file(str(scene_path), max_script_members)
+		scenes.append(scene_summary)
+		for script_path in scene_summary.get("scripts", []):
+			_append_unique(referenced_scripts, str(script_path))
+
+	var scripts: Array = []
+	if include_scripts:
+		var script_paths: Array = []
+		_collect_matching_files("res://", true, max_files, script_paths, [".gd", ".cs", ".gdshader", ".shader"])
+		script_paths = _exclude_internal_plugin_paths(script_paths)
+		for script_path in referenced_scripts:
+			if str(script_path).begins_with("res://addons/funplay_mcp/"):
+				continue
+			if not script_paths.has(script_path):
+				script_paths.append(script_path)
+		script_paths.sort()
+		for script_path in script_paths:
+			if scripts.size() >= max_files:
+				break
+			if FileAccess.file_exists(str(script_path)):
+				scripts.append(_summarize_script_file(str(script_path), max_script_members))
+
+	var project_map: Dictionary = {
+		"project": {
+			"name": str(ProjectSettings.get_setting("application/config/name", "")),
+			"root": ProjectSettings.globalize_path("res://"),
+			"main_scene": str(ProjectSettings.get_setting("application/run/main_scene", "")),
+			"current_scene_path": editor.get_current_path(),
+			"open_scenes": editor.get_open_scenes(),
+			"script_language_mode": detect_script_language_mode(),
+		},
+		"limits": {
+			"max_files": max_files,
+			"max_script_members": max_script_members,
+			"include_scripts": include_scripts,
+			"include_graph": include_graph,
+		},
+		"counts": {
+			"scenes": scenes.size(),
+			"scripts": scripts.size(),
+			"referenced_scripts": referenced_scripts.size(),
+		},
+		"scenes": scenes,
+		"scripts": scripts,
+	}
+	if include_graph:
+		project_map["graph"] = _build_project_map_graph(project_map)
+
+	if output_format == "html":
+		return _render_project_map_html(project_map)
+	return _render_variant(project_map)
+
+
+func find_usages(arguments: Dictionary) -> String:
+	var symbol: String = str(arguments.get("symbol", "")).strip_edges()
+	if symbol == "":
+		return "Error: 'symbol' is required."
+
+	var root_path: String = _normalize_path(str(arguments.get("path", "res://")))
+	var case_sensitive: bool = bool(arguments.get("case_sensitive", true))
+	var max_results: int = int(clamp(int(arguments.get("max_results", 200)), 1, 2000))
+	var files: Array = []
+	if FileAccess.file_exists(root_path):
+		if _matches_extension(root_path, TEXT_EXTENSIONS):
+			files.append(root_path)
+	else:
+		_collect_matching_files(root_path, true, 5000, files, TEXT_EXTENSIONS)
+	files = _exclude_internal_plugin_paths(files)
+	files.sort()
+
+	var needle: String = symbol if case_sensitive else symbol.to_lower()
+	var matches: Array = []
+	for file_path in files:
+		if matches.size() >= max_results:
+			break
+		var file: FileAccess = FileAccess.open(str(file_path), FileAccess.READ)
+		if file == null:
+			continue
+		var lines: PackedStringArray = file.get_as_text().split("\n")
+		for line_index in range(lines.size()):
+			var line: String = lines[line_index]
+			var haystack: String = line if case_sensitive else line.to_lower()
+			var start_index: int = 0
+			while start_index < haystack.length():
+				var column_index: int = haystack.find(needle, start_index)
+				if column_index == -1:
+					break
+				matches.append({
+					"path": str(file_path),
+					"line": line_index + 1,
+					"column": column_index + 1,
+					"snippet": line.strip_edges().substr(0, 240),
+				})
+				if matches.size() >= max_results:
+					break
+				start_index = column_index + max(needle.length(), 1)
+			if matches.size() >= max_results:
+				break
+
+	return _render_variant({
+		"symbol": symbol,
+		"path": root_path,
+		"case_sensitive": case_sensitive,
+		"count": matches.size(),
+		"truncated": matches.size() >= max_results,
+		"matches": matches,
+	})
+
+
 func list_scenes(arguments: Dictionary) -> String:
 	var root_path = _normalize_path(str(arguments.get("path", "res://")))
 	var max_entries = clamp(int(arguments.get("max_entries", 300)), 1, 3000)
@@ -3175,6 +3301,406 @@ func _collect_matching_files(path: String, recursive: bool, max_entries: int, re
 		item = dir.get_next()
 
 	dir.list_dir_end()
+
+
+func _summarize_scene_file(path: String, max_items: int) -> Dictionary:
+	var nodes: Array = []
+	var resources: Array = []
+	var scripts: Array = []
+	var connections: Array = []
+	var ext_resource_paths: Dictionary = {}
+	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {
+			"path": path,
+			"error": "Failed to open scene file.",
+			"node_count": 0,
+			"nodes": nodes,
+			"scripts": scripts,
+			"resources": resources,
+			"connections": connections,
+		}
+
+	var lines: PackedStringArray = file.get_as_text().split("\n")
+	var node_count: int = 0
+	for raw_line in lines:
+		var line: String = str(raw_line).strip_edges()
+		if line.begins_with("[ext_resource"):
+			var resource_id: String = _extract_quoted_attribute(line, "id")
+			var resource_path: String = _extract_quoted_attribute(line, "path")
+			var resource_type: String = _extract_quoted_attribute(line, "type")
+			if resource_id != "" and resource_path != "":
+				ext_resource_paths[resource_id] = resource_path
+			if resource_path != "":
+				resources.append({
+					"id": resource_id,
+					"type": resource_type,
+					"path": resource_path,
+				})
+				if resource_type == "Script" or _matches_extension(resource_path, [".gd", ".cs"]):
+					_append_unique(scripts, resource_path)
+		elif line.begins_with("[node"):
+			node_count += 1
+			if nodes.size() < max_items:
+				nodes.append({
+					"name": _extract_quoted_attribute(line, "name"),
+					"type": _extract_quoted_attribute(line, "type"),
+					"parent": _extract_quoted_attribute(line, "parent"),
+					"instance": _extract_resource_reference_id(line, "ExtResource"),
+				})
+		elif line.begins_with("script"):
+			var script_id: String = _extract_resource_reference_id(line, "ExtResource")
+			if script_id != "" and ext_resource_paths.has(script_id):
+				_append_unique(scripts, str(ext_resource_paths[script_id]))
+		elif line.begins_with("[connection") and connections.size() < max_items:
+			connections.append({
+				"signal": _extract_quoted_attribute(line, "signal"),
+				"from": _extract_quoted_attribute(line, "from"),
+				"to": _extract_quoted_attribute(line, "to"),
+				"method": _extract_quoted_attribute(line, "method"),
+			})
+
+	return {
+		"path": path,
+		"line_count": lines.size(),
+		"node_count": node_count,
+		"nodes_truncated": node_count > nodes.size(),
+		"nodes": nodes,
+		"scripts": scripts,
+		"resources": resources,
+		"connections": connections,
+	}
+
+
+func _summarize_script_file(path: String, max_members: int) -> Dictionary:
+	var language: String = _guess_script_language(path)
+	var functions: Array = []
+	var signals: Array = []
+	var exports: Array = []
+	var dependencies: Array = []
+	var class_name: String = ""
+	var extends_name: String = ""
+	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {
+			"path": path,
+			"language": language,
+			"error": "Failed to open script file.",
+		}
+
+	var lines: PackedStringArray = file.get_as_text().split("\n")
+	for line_index in range(lines.size()):
+		var line: String = str(lines[line_index])
+		var trimmed: String = line.strip_edges()
+		if trimmed == "" or trimmed.begins_with("#") or trimmed.begins_with("//"):
+			continue
+
+		if trimmed.begins_with("class_name "):
+			class_name = trimmed.trim_prefix("class_name ").strip_edges()
+		elif trimmed.begins_with("extends "):
+			extends_name = trimmed.trim_prefix("extends ").strip_edges()
+		elif language == "dotnet" and trimmed.contains(" class "):
+			var csharp_class: Dictionary = _extract_csharp_class(trimmed)
+			if csharp_class.get("class_name", "") != "":
+				class_name = str(csharp_class.get("class_name", ""))
+			if csharp_class.get("extends", "") != "":
+				extends_name = str(csharp_class.get("extends", ""))
+
+		var signal_name: String = _extract_gdscript_signal_name(trimmed)
+		if signal_name != "" and signals.size() < max_members:
+			signals.append({
+				"name": signal_name,
+				"line": line_index + 1,
+			})
+
+		var function_name: String = _extract_function_name(trimmed, language)
+		if function_name != "" and functions.size() < max_members:
+			functions.append({
+				"name": function_name,
+				"line": line_index + 1,
+			})
+
+		var export_name: String = _extract_export_name(trimmed, language)
+		if export_name != "" and exports.size() < max_members:
+			exports.append({
+				"name": export_name,
+				"line": line_index + 1,
+			})
+
+		for dependency in _extract_load_paths(trimmed):
+			_append_unique(dependencies, str(dependency))
+
+	return {
+		"path": path,
+		"language": language,
+		"line_count": lines.size(),
+		"class_name": class_name,
+		"extends": extends_name,
+		"signals": signals,
+		"functions": functions,
+		"exports": exports,
+		"dependencies": dependencies,
+		"members_truncated": functions.size() >= max_members or signals.size() >= max_members or exports.size() >= max_members,
+	}
+
+
+func _build_project_map_graph(project_map: Dictionary) -> Dictionary:
+	var nodes: Array = []
+	var edges: Array = []
+	var seen_nodes: Dictionary = {}
+	var project_info: Dictionary = project_map.get("project", {})
+	var project_name: String = str(project_info.get("name", "Godot Project"))
+	_add_project_map_node(nodes, seen_nodes, "project", project_name if project_name != "" else "Godot Project", "project", "")
+
+	for scene in project_map.get("scenes", []):
+		var scene_path: String = str(scene.get("path", ""))
+		var scene_id: String = "scene:%s" % scene_path
+		_add_project_map_node(nodes, seen_nodes, scene_id, scene_path.get_file(), "scene", scene_path)
+		edges.append({"from": "project", "to": scene_id, "kind": "contains"})
+		for script_path in scene.get("scripts", []):
+			var script_id: String = "script:%s" % str(script_path)
+			_add_project_map_node(nodes, seen_nodes, script_id, str(script_path).get_file(), "script", str(script_path))
+			edges.append({"from": scene_id, "to": script_id, "kind": "uses_script"})
+
+	for script in project_map.get("scripts", []):
+		var path: String = str(script.get("path", ""))
+		var script_id: String = "script:%s" % path
+		_add_project_map_node(nodes, seen_nodes, script_id, path.get_file(), "script", path)
+		for dependency in script.get("dependencies", []):
+			var dependency_path: String = str(dependency)
+			var dependency_id: String = "resource:%s" % dependency_path
+			_add_project_map_node(nodes, seen_nodes, dependency_id, dependency_path.get_file(), "resource", dependency_path)
+			edges.append({"from": script_id, "to": dependency_id, "kind": "loads"})
+
+	return {
+		"nodes": nodes,
+		"edges": edges,
+	}
+
+
+func _add_project_map_node(nodes: Array, seen_nodes: Dictionary, id: String, label: String, kind: String, path: String) -> void:
+	if seen_nodes.has(id):
+		return
+	seen_nodes[id] = true
+	nodes.append({
+		"id": id,
+		"label": label,
+		"kind": kind,
+		"path": path,
+	})
+
+
+func _render_project_map_html(project_map: Dictionary) -> String:
+	var project: Dictionary = project_map.get("project", {})
+	var counts: Dictionary = project_map.get("counts", {})
+	var html: Array = []
+	html.append("<!doctype html>")
+	html.append("<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>")
+	html.append("<title>%s Project Map</title>" % _html_escape(str(project.get("name", "Godot"))))
+	html.append("<style>")
+	html.append(":root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#17202a;background:#f5f7fb}body{margin:0}.wrap{max-width:1180px;margin:0 auto;padding:28px}header{display:flex;gap:20px;justify-content:space-between;align-items:flex-end;border-bottom:1px solid #dbe2ea;padding-bottom:18px;margin-bottom:18px}h1{font-size:28px;margin:0 0 6px}h2{font-size:18px;margin:26px 0 12px}.muted{color:#5d6b7a}.stats{display:flex;gap:10px;flex-wrap:wrap}.stat{background:#fff;border:1px solid #dbe2ea;border-radius:8px;padding:10px 14px;min-width:86px}.stat b{display:block;font-size:22px}.toolbar{display:flex;gap:10px;margin:18px 0}.toolbar input{width:100%;border:1px solid #cbd5df;border-radius:8px;padding:10px 12px;font-size:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}.card{background:#fff;border:1px solid #dbe2ea;border-radius:8px;padding:14px;box-shadow:0 1px 2px rgba(20,30,40,.04)}.card h3{font-size:15px;margin:0 0 8px}.pill{display:inline-block;background:#edf2f7;border-radius:999px;padding:3px 8px;font-size:12px;margin:2px;color:#334155}.path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#475569;word-break:break-all}.list{margin:8px 0 0;padding-left:18px}.list li{margin:3px 0}.hidden{display:none}")
+	html.append("</style></head><body><main class='wrap'>")
+	html.append("<header><div><h1>%s</h1><div class='muted'>%s</div></div><div class='stats'>" % [
+		_html_escape(str(project.get("name", "Godot Project"))),
+		_html_escape(str(project.get("root", ""))),
+	])
+	html.append("<div class='stat'><b>%s</b><span>Scenes</span></div>" % str(counts.get("scenes", 0)))
+	html.append("<div class='stat'><b>%s</b><span>Scripts</span></div>" % str(counts.get("scripts", 0)))
+	html.append("<div class='stat'><b>%s</b><span>Refs</span></div>" % str(counts.get("referenced_scripts", 0)))
+	html.append("</div></header>")
+	html.append("<div class='toolbar'><input id='filter' placeholder='Filter scenes, scripts, functions, signals, or paths' oninput='filterCards(this.value)'></div>")
+	html.append("<h2>Scenes</h2><section class='grid'>")
+	for scene in project_map.get("scenes", []):
+		var scene_search: String = "%s %s" % [str(scene.get("path", "")), JSON.stringify(scene.get("scripts", []))]
+		html.append("<article class='card' data-search='%s'>" % _html_escape(scene_search.to_lower()))
+		html.append("<h3>%s</h3><div class='path'>%s</div>" % [
+			_html_escape(str(scene.get("path", "")).get_file()),
+			_html_escape(str(scene.get("path", ""))),
+		])
+		html.append("<p class='muted'>%s nodes, %s script refs</p>" % [str(scene.get("node_count", 0)), str(scene.get("scripts", []).size())])
+		for script_path in scene.get("scripts", []):
+			html.append("<span class='pill'>%s</span>" % _html_escape(str(script_path).get_file()))
+		var scene_nodes: Array = scene.get("nodes", [])
+		if scene_nodes.size() > 0:
+			html.append("<ul class='list'>")
+			for node in scene_nodes.slice(0, min(scene_nodes.size(), 8)):
+				html.append("<li>%s <span class='muted'>%s</span></li>" % [
+					_html_escape(str(node.get("name", ""))),
+					_html_escape(str(node.get("type", ""))),
+				])
+			html.append("</ul>")
+		html.append("</article>")
+	html.append("</section>")
+	html.append("<h2>Scripts</h2><section class='grid'>")
+	for script in project_map.get("scripts", []):
+		var script_functions: Array = script.get("functions", [])
+		var script_signals: Array = script.get("signals", [])
+		var class_label: String = str(script.get("class_name", ""))
+		if class_label == "":
+			class_label = str(script.get("language", ""))
+		var script_search: String = "%s %s %s %s %s" % [
+			str(script.get("path", "")),
+			str(script.get("class_name", "")),
+			str(script.get("extends", "")),
+			JSON.stringify(script_functions),
+			JSON.stringify(script_signals),
+		]
+		html.append("<article class='card' data-search='%s'>" % _html_escape(script_search.to_lower()))
+		html.append("<h3>%s</h3><div class='path'>%s</div>" % [
+			_html_escape(str(script.get("path", "")).get_file()),
+			_html_escape(str(script.get("path", ""))),
+		])
+		html.append("<p class='muted'>%s extends %s</p>" % [
+			_html_escape(class_label),
+			_html_escape(str(script.get("extends", ""))),
+		])
+		for signal_info in script_signals:
+			html.append("<span class='pill'>signal %s</span>" % _html_escape(str(signal_info.get("name", ""))))
+		for function_info in script_functions.slice(0, min(script_functions.size(), 12)):
+			html.append("<span class='pill'>%s()</span>" % _html_escape(str(function_info.get("name", ""))))
+		html.append("</article>")
+	html.append("</section>")
+	html.append("<script>function filterCards(q){q=(q||'').toLowerCase();document.querySelectorAll('.card').forEach(function(card){card.classList.toggle('hidden',q&&card.dataset.search.indexOf(q)===-1);});}</script>")
+	html.append("</main></body></html>")
+	return "\n".join(html)
+
+
+func _extract_quoted_attribute(line: String, attribute: String) -> String:
+	var needle: String = "%s=\"" % attribute
+	var start_index: int = line.find(needle)
+	if start_index == -1:
+		return ""
+	start_index += needle.length()
+	var end_index: int = line.find("\"", start_index)
+	if end_index == -1:
+		return ""
+	return line.substr(start_index, end_index - start_index)
+
+
+func _extract_resource_reference_id(line: String, resource_type: String) -> String:
+	var marker: String = "%s(\"" % resource_type
+	var start_index: int = line.find(marker)
+	if start_index == -1:
+		return ""
+	start_index += marker.length()
+	var end_index: int = line.find("\"", start_index)
+	if end_index == -1:
+		return ""
+	return line.substr(start_index, end_index - start_index)
+
+
+func _extract_load_paths(line: String) -> Array:
+	var paths: Array = []
+	var cursor: int = 0
+	while cursor < line.length():
+		var start_index: int = line.find("res://", cursor)
+		if start_index == -1:
+			break
+		var end_index: int = start_index
+		while end_index < line.length():
+			var ch: String = line.substr(end_index, 1)
+			if ch in ["\"", "'", ")", ",", " ", "\t"]:
+				break
+			end_index += 1
+		_append_unique(paths, line.substr(start_index, end_index - start_index))
+		cursor = end_index + 1
+	return paths
+
+
+func _extract_gdscript_signal_name(line: String) -> String:
+	if not line.begins_with("signal "):
+		return ""
+	var text: String = line.trim_prefix("signal ").strip_edges()
+	return _first_token_before(text, ["(", ":", " "])
+
+
+func _extract_function_name(line: String, language: String) -> String:
+	if language == "dotnet":
+		return _extract_csharp_method_name(line)
+	var text: String = line
+	if text.begins_with("static "):
+		text = text.trim_prefix("static ").strip_edges()
+	if not text.begins_with("func "):
+		return ""
+	text = text.trim_prefix("func ").strip_edges()
+	return _first_token_before(text, ["("])
+
+
+func _extract_export_name(line: String, language: String) -> String:
+	if language == "dotnet":
+		if not line.contains("[Export"):
+			return ""
+		var before_brace: String = line.split("{", false, 1)[0].strip_edges()
+		var parts: PackedStringArray = before_brace.split(" ", false)
+		if parts.size() > 0:
+			return str(parts[parts.size() - 1]).strip_edges().trim_suffix(";")
+		return ""
+	if not (line.begins_with("@export") or line.begins_with("export ")):
+		return ""
+	var var_index: int = line.find("var ")
+	if var_index == -1:
+		return ""
+	var text: String = line.substr(var_index + 4).strip_edges()
+	return _first_token_before(text, [":", "=", " "])
+
+
+func _extract_csharp_method_name(line: String) -> String:
+	if not line.contains("("):
+		return ""
+	if line.contains(" class ") or line.begins_with("if ") or line.begins_with("for ") or line.begins_with("while ") or line.begins_with("switch "):
+		return ""
+	var has_access: bool = line.begins_with("public ") or line.begins_with("private ") or line.begins_with("protected ") or line.begins_with("internal ")
+	if not has_access:
+		return ""
+	var before_paren: String = line.split("(", false, 1)[0].strip_edges()
+	var parts: PackedStringArray = before_paren.split(" ", false)
+	if parts.size() < 2:
+		return ""
+	return str(parts[parts.size() - 1]).strip_edges()
+
+
+func _extract_csharp_class(line: String) -> Dictionary:
+	var class_index: int = line.find(" class ")
+	if class_index == -1:
+		return {}
+	var after_class: String = line.substr(class_index + 7).strip_edges()
+	var class_name: String = _first_token_before(after_class, [" ", ":", "{"])
+	var extends_name: String = ""
+	var colon_index: int = line.find(":")
+	if colon_index != -1:
+		var after_colon: String = line.substr(colon_index + 1).strip_edges()
+		extends_name = _first_token_before(after_colon, [",", "{", " "])
+	return {
+		"class_name": class_name,
+		"extends": extends_name,
+	}
+
+
+func _first_token_before(text: String, delimiters: Array) -> String:
+	var end_index: int = text.length()
+	for delimiter in delimiters:
+		var index: int = text.find(str(delimiter))
+		if index != -1 and index < end_index:
+			end_index = index
+	return text.substr(0, end_index).strip_edges()
+
+
+func _guess_script_language(path: String) -> String:
+	var lower: String = path.to_lower()
+	if lower.ends_with(".cs"):
+		return "dotnet"
+	if lower.ends_with(".gdshader") or lower.ends_with(".shader"):
+		return "shader"
+	return "gdscript"
+
+
+func _append_unique(values: Array, value) -> void:
+	if not values.has(value):
+		values.append(value)
+
+
+func _html_escape(value) -> String:
+	return str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;")
 
 
 func _search_files_recursive(path: String, pattern: String, mode: String, recursive: bool, max_results: int, matches: Array) -> void:

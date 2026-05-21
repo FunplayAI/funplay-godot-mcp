@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.0] - 2026-05-21
+
+### Added
+- Added `map_project` for lightweight project maps as JSON or self-contained HTML, including scenes, scripts, functions, signals, resources, and graph edges
+- Added `find_usages` for project-wide symbol usage search with file, line, column, and snippets
+- Added project map and template MCP resources plus workflow prompts for architecture, performance, networking, generic template generation, assets, and update safety
+- Added Godot Asset Library release notes and package/update safety guidance
+
+### Changed
+- Included Asset Library release notes in the validated release package allowlist and reject symlinks in package builds/verification
+
 ## [0.7.0] - 2026-05-21
 
 ### Added

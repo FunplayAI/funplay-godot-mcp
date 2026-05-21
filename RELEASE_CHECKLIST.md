@@ -11,6 +11,7 @@ Use this checklist before publishing a new open-source release of Funplay MCP fo
 - [ ] `server.json` and `stdio-wrapper/package.json` versions match the intended release
 - [ ] `CHANGELOG.md` includes the release notes for the target version
 - [ ] `README.md` and `README_CN.md` match the current product behavior
+- [ ] `ASSET_LIBRARY.md` matches the current Godot Asset Library package behavior
 - [ ] `python scripts/validate_repo.py` passes locally
 - [ ] `python scripts/package_release.py --version <version>` builds release artifacts locally
 
@@ -48,12 +49,23 @@ Use this checklist before publishing a new open-source release of Funplay MCP fo
 - [ ] `.github/workflows/release.yml` has the expected tag trigger and `contents: write` permission
 - [ ] Release artifacts contain only allowed roots: `addons/funplay_mcp/**`, docs, license, changelog, and `server.json`
 - [ ] `release-manifest.json` and `SHA256SUMS.txt` are present in `dist/v<version>/`
+- [ ] Release artifact checksums match `SHA256SUMS.txt`
+- [ ] If an update/import flow is changed, verify its write allowlist is restricted to `res://addons/funplay_mcp/` unless explicitly documented
 - [ ] PR checklist still reflects the current release process
 - [ ] License file is present and correct
 - [ ] Repository description/topics are set on GitHub
 - [ ] Initial tags or release tags follow the chosen versioning scheme
 
-## 6. Publish
+## 6. Godot Asset Library Readiness
+
+- [ ] Package installs cleanly from the generated zip into a fresh Godot project
+- [ ] Package root contains `addons/funplay_mcp/plugin.cfg`
+- [ ] Package metadata uses the intended icon, license, category, Godot version, and support URL
+- [ ] Asset Library download URL points to the GitHub Release zip for the target version
+- [ ] Submission notes mention native Godot HTTP, no sidecar daemon for core workflows, and optional stdio wrapper support
+- [ ] Any future automatic updater keeps checksum verification, dry-run reporting, and path allowlist checks
+
+## 7. Publish
 
 - [ ] Commit the release changes with a clear release-oriented message
 - [ ] Create and push the release tag
@@ -62,7 +74,7 @@ Use this checklist before publishing a new open-source release of Funplay MCP fo
 - [ ] Verify the public repository renders the README correctly
 - [ ] If publishing the stdio wrapper, publish `stdio-wrapper/` to npm before submitting `server.json` to the MCP Registry
 
-## 7. Post-Release
+## 8. Post-Release
 
 - [ ] Re-test installation from the public Git URL or addon copy path
 - [ ] Re-test installation from the GitHub Release zip

@@ -193,6 +193,26 @@ func _register_tools() -> void:
 		"properties": {"max_depth": {"type": "integer", "default": 4}},
 	}, "get_scene_tree", ["core", "full"])
 	_register_tool("get_selection", "Return the current editor node selection.", _empty_schema(), "get_selection", ["core", "full"])
+	_register_tool("map_project", "Return a lightweight project map as structured JSON or self-contained HTML with scenes, scripts, dependencies, signals, functions, and graph edges.", {
+		"type": "object",
+		"properties": {
+			"format": {"type": "string", "enum": ["json", "html"], "default": "json"},
+			"include_scripts": {"type": "boolean", "default": true},
+			"include_graph": {"type": "boolean", "default": true},
+			"max_files": {"type": "integer", "default": 300},
+			"max_script_members": {"type": "integer", "default": 80},
+		},
+	}, "map_project", ["core", "full"])
+	_register_tool("find_usages", "Find textual usages of a symbol across project text files with line numbers and snippets.", {
+		"type": "object",
+		"properties": {
+			"symbol": {"type": "string"},
+			"path": {"type": "string", "default": "res://"},
+			"case_sensitive": {"type": "boolean", "default": true},
+			"max_results": {"type": "integer", "default": 200},
+		},
+		"required": ["symbol"],
+	}, "find_usages", ["core", "full"])
 	_register_tool("list_scenes", "List scene files in the project and report currently open scenes.", {
 		"type": "object",
 		"properties": {
@@ -1107,6 +1127,8 @@ func _infer_tool_group(tool_name: String) -> String:
 		return "execution"
 	if tool_name in ["funplay_help", "list_tool_catalog", "get_capability_status", "list_workflow_coverage"]:
 		return "guidance"
+	if tool_name in ["map_project", "find_usages"]:
+		return "project_map"
 	if tool_name in ["get_editor_protocol_status", "get_script_errors", "validate_script", "request_script_reload", "get_console_logs", "get_performance_snapshot", "analyze_scene_complexity"]:
 		return "diagnostics"
 	if tool_name in ["get_project_info", "list_project_features", "list_project_settings", "get_project_setting", "set_project_setting", "get_project_skills_status", "generate_project_skills"]:
@@ -1150,6 +1172,8 @@ func _group_description(group_name: String) -> String:
 			return "Primary execution, capture, logging, and stabilization tools."
 		"diagnostics":
 			return "Script, log, performance, LSP/DAP, and scene diagnostic tools."
+		"project_map":
+			return "Project map, script relationship, and usage analysis."
 		"project":
 			return "Project settings, feature summaries, and Project Skills."
 		"input":

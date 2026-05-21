@@ -11,6 +11,7 @@ import json
 import pathlib
 import re
 import shutil
+import stat
 import sys
 import zipfile
 
@@ -32,6 +33,7 @@ ALLOWED_ROOT_FILES = {
     "LICENSE",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
+    "ASSET_LIBRARY.md",
     "server.json",
 }
 FORBIDDEN_NAMES = {
@@ -114,6 +116,8 @@ def validate_version(version: str) -> None:
 
 
 def is_forbidden_path(path: pathlib.Path) -> bool:
+    if path.is_symlink():
+        return True
     relative = path.relative_to(ROOT)
     if path.name in FORBIDDEN_NAMES:
         return True
@@ -154,11 +158,15 @@ def validate_package_member(name: str) -> str | None:
 def validate_zip(path: pathlib.Path) -> None:
     errors: list[str] = []
     with zipfile.ZipFile(path, "r") as archive:
-        names = [info.filename for info in archive.infolist() if not info.is_dir()]
-        for name in names:
-            error = validate_package_member(name)
+        infos = [info for info in archive.infolist() if not info.is_dir()]
+        names = [info.filename for info in infos]
+        for info in infos:
+            error = validate_package_member(info.filename)
             if error:
                 errors.append(error)
+            mode = (info.external_attr >> 16) & 0o777777
+            if stat.S_ISLNK(mode):
+                errors.append(f"Symlink is not allowed in package: {info.filename}")
         required = f"{ADDON_ROOT}/plugin.cfg"
         if required not in names:
             errors.append(f"Package is missing {required}")
