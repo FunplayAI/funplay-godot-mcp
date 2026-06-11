@@ -182,6 +182,7 @@ func _register_tools() -> void:
 			"code": {"type": "string"},
 			"context_mode": {"type": "string", "enum": ["dictionary", "object"], "default": "dictionary"},
 			"include_metadata": {"type": "boolean", "default": true},
+			"safety_checks": {"type": "boolean", "default": true},
 		},
 		"required": ["code"],
 	}, "execute_code", ["core", "full"])

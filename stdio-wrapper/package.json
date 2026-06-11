@@ -1,6 +1,6 @@
 {
   "name": "funplay-godot-mcp",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "stdio bridge for the local Funplay MCP for Godot editor addon.",
   "license": "MIT",
   "type": "module",

@@ -22,6 +22,8 @@ var _enable_checkbox: CheckBox
 var _port_spinbox: SpinBox
 var _profile_button: OptionButton
 var _debug_checkbox: CheckBox
+var _execute_safety_checkbox: CheckBox
+var _map_status_label: Label
 var _tool_exposure_label: Label
 var _tool_list: VBoxContainer
 var _client_button: OptionButton
@@ -58,11 +60,15 @@ func refresh_live_state(force: bool = false) -> void:
 	if _status_label == null:
 		return
 
-	_status_label.text = "Status: Running" if _server.is_running() else "Status: Stopped"
+	var status_text: String = "Stopped"
+	if _server.is_running():
+		status_text = "Attached" if _server.has_method("is_attached_to_existing") and _server.is_attached_to_existing() else "Running"
+	_status_label.text = "Status: %s" % status_text
 	_endpoint_label.text = "Endpoint: %s" % (_server.get_endpoint() if _server.is_running() else "http://127.0.0.1:%d/" % _settings.server_port)
 	_enable_checkbox.set_pressed_no_signal(_settings.server_enabled)
 	_port_spinbox.set_value_no_signal(_settings.server_port)
 	_debug_checkbox.set_pressed_no_signal(_settings.debug_logging_enabled)
+	_execute_safety_checkbox.set_pressed_no_signal(_settings.execute_code_safety_checks_enabled)
 
 	if _settings.tool_profile == "core":
 		_profile_button.select(0)
@@ -157,6 +163,27 @@ func _build_ui() -> void:
 	_debug_checkbox.tooltip_text = "Print MCP activity to the Godot output panel."
 	_debug_checkbox.toggled.connect(_on_debug_logging_toggled)
 	add_child(_debug_checkbox)
+
+	_execute_safety_checkbox = CheckBox.new()
+	_execute_safety_checkbox.text = "execute_code Safety Checks"
+	_execute_safety_checkbox.tooltip_text = "Block common dangerous filesystem, process, and project-setting snippets by default. Tool calls can still override with safety_checks=false."
+	_execute_safety_checkbox.toggled.connect(_on_execute_safety_toggled)
+	add_child(_execute_safety_checkbox)
+
+	var map_row = HBoxContainer.new()
+	map_row.add_theme_constant_override("separation", 6)
+	add_child(map_row)
+
+	var open_map_button = Button.new()
+	open_map_button.text = "Open Project Map"
+	open_map_button.tooltip_text = "Generate a read-only HTML project visualizer from map_project and open it in the browser."
+	open_map_button.pressed.connect(_open_project_map)
+	map_row.add_child(open_map_button)
+
+	_map_status_label = Label.new()
+	_map_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_map_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	map_row.add_child(_map_status_label)
 
 	var exposure_header = HBoxContainer.new()
 	exposure_header.add_theme_constant_override("separation", 6)
@@ -275,6 +302,11 @@ func _on_debug_logging_toggled(pressed: bool) -> void:
 	refresh_live_state(true)
 
 
+func _on_execute_safety_toggled(pressed: bool) -> void:
+	_settings.update_execute_code_safety_checks_enabled(pressed)
+	refresh_live_state(true)
+
+
 func _on_client_selected(_index: int) -> void:
 	refresh_live_state(true)
 
@@ -315,6 +347,29 @@ func _check_for_updates() -> void:
 
 func _open_latest_release() -> void:
 	_update_checker.open_latest_release()
+
+
+func _open_project_map() -> void:
+	if _tool_registry == null:
+		_map_status_label.text = "Project map unavailable."
+		return
+	var html: String = _tool_registry.call_tool("map_project", {
+		"format": "html",
+		"max_files": 500,
+		"max_script_members": 120,
+	})
+	if html.begins_with("Error:"):
+		_map_status_label.text = html
+		return
+	var output_path: String = "user://funplay_mcp_project_map.html"
+	var file: FileAccess = FileAccess.open(output_path, FileAccess.WRITE)
+	if file == null:
+		_map_status_label.text = "Failed to write project map."
+		return
+	file.store_string(html)
+	var global_path: String = ProjectSettings.globalize_path(output_path)
+	OS.shell_open(global_path)
+	_map_status_label.text = "Opened %s" % global_path
 
 
 func _on_update_state_changed() -> void:

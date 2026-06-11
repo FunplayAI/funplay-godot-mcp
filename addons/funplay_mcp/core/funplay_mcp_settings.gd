@@ -9,6 +9,7 @@ var server_enabled: bool = true
 var server_port: int = 8765
 var tool_profile: String = "core"
 var debug_logging_enabled: bool = false
+var execute_code_safety_checks_enabled: bool = true
 var disabled_tools: Array[String] = []
 
 
@@ -26,6 +27,7 @@ func load_settings() -> void:
 	server_port = int(config.get_value("server", "port", 8765))
 	tool_profile = str(config.get_value("server", "tool_profile", "core"))
 	debug_logging_enabled = bool(config.get_value("server", "debug_logging_enabled", false))
+	execute_code_safety_checks_enabled = bool(config.get_value("server", "execute_code_safety_checks_enabled", true))
 	disabled_tools = _normalize_string_array(config.get_value("tools", "disabled", []))
 
 
@@ -35,6 +37,7 @@ func save_settings() -> void:
 	config.set_value("server", "port", server_port)
 	config.set_value("server", "tool_profile", tool_profile)
 	config.set_value("server", "debug_logging_enabled", debug_logging_enabled)
+	config.set_value("server", "execute_code_safety_checks_enabled", execute_code_safety_checks_enabled)
 	config.set_value("tools", "disabled", disabled_tools)
 	config.save(SETTINGS_PATH)
 
@@ -69,6 +72,14 @@ func update_debug_logging_enabled(value: bool) -> void:
 	if debug_logging_enabled == value:
 		return
 	debug_logging_enabled = value
+	save_settings()
+	settings_changed.emit()
+
+
+func update_execute_code_safety_checks_enabled(value: bool) -> void:
+	if execute_code_safety_checks_enabled == value:
+		return
+	execute_code_safety_checks_enabled = value
 	save_settings()
 	settings_changed.emit()
 

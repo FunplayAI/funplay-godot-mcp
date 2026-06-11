@@ -201,6 +201,16 @@ func execute_code(arguments: Dictionary) -> String:
 	if code == "":
 		return "Error: 'code' is required."
 
+	var safety_checks: bool = _resolve_execute_code_safety_checks(arguments)
+	if safety_checks:
+		var safety_result: Dictionary = _validate_execute_code_safety(code)
+		if not bool(safety_result.get("ok", false)):
+			return _render_tool_error(
+				"EXECUTE_CODE_SAFETY_BLOCKED",
+				"execute_code safety checks blocked this snippet. Use focused file/project tools, or pass safety_checks=false only when you have reviewed the code.",
+				safety_result
+			)
+
 	var wrapped_lines = PackedStringArray([
 		"@tool",
 		"extends RefCounted",
@@ -253,6 +263,7 @@ func get_project_info(_arguments: Dictionary) -> String:
 	var root = editor.get_edited_scene_root()
 	var info = {
 		"project_name": str(ProjectSettings.get_setting("application/config/name", "")),
+		"project_identity": ProjectSettings.globalize_path("res://").sha256_text().substr(0, 16),
 		"godot_version": Engine.get_version_info(),
 		"project_root": ProjectSettings.globalize_path("res://"),
 		"current_scene_path": editor.get_current_path(),
@@ -266,6 +277,7 @@ func get_project_info(_arguments: Dictionary) -> String:
 		"server_enabled": _settings.server_enabled if _settings != null else true,
 		"server_port": _settings.server_port if _settings != null else 8765,
 		"debug_logging_enabled": _settings.debug_logging_enabled if _settings != null else false,
+		"execute_code_safety_checks_enabled": _settings.execute_code_safety_checks_enabled if _settings != null else true,
 		"disabled_tool_count": _settings.disabled_tools.size() if _settings != null else 0,
 	}
 	return _render_variant(info)
@@ -2854,6 +2866,7 @@ func get_capability_status(_arguments: Dictionary) -> String:
 			"tool_registry": _tool_registry != null,
 			"resources": true,
 			"prompts": true,
+			"execute_code_safety_checks": _settings.execute_code_safety_checks_enabled if _settings != null else true,
 			"scene_open": scene_root != null,
 			"play_mode": editor.has_method("is_playing_scene"),
 			"dotnet": language_mode == "dotnet" or language_mode == "mixed",
@@ -2965,6 +2978,77 @@ func list_workflow_coverage(_arguments: Dictionary) -> String:
 	})
 
 
+func _resolve_execute_code_safety_checks(arguments: Dictionary) -> bool:
+	if arguments.has("safety_checks"):
+		return bool(arguments.get("safety_checks"))
+	return _settings.execute_code_safety_checks_enabled if _settings != null else true
+
+
+func _validate_execute_code_safety(code: String) -> Dictionary:
+	var normalized: String = code.to_lower()
+	var matches: Array = []
+	var rules: Array = [
+		{"needle": "os.execute(", "code": "process_execution", "message": "External process execution is blocked."},
+		{"needle": "os.create_process(", "code": "process_execution", "message": "External process creation is blocked."},
+		{"needle": "os.shell_open(", "code": "process_execution", "message": "Opening shell URLs or files is blocked from execute_code."},
+		{"needle": "projectsettings.set_setting(", "code": "project_settings_write", "message": "ProjectSettings writes should use focused project tools."},
+		{"needle": "projectsettings.save(", "code": "project_settings_write", "message": "ProjectSettings.save is blocked from execute_code."},
+		{"needle": "resourcesaver.save(", "code": "resource_write", "message": "ResourceSaver writes should use focused save/create tools."},
+		{"needle": "diraccess.remove", "code": "filesystem_mutation", "message": "Directory removal is blocked."},
+		{"needle": "diraccess.rename", "code": "filesystem_mutation", "message": "Directory rename is blocked."},
+		{"needle": "diraccess.make_dir", "code": "filesystem_mutation", "message": "Directory creation is blocked from execute_code."},
+	]
+	for rule in rules:
+		var needle: String = str(rule.get("needle", ""))
+		if normalized.find(needle) != -1:
+			matches.append(rule)
+
+	if normalized.find("fileaccess.open") != -1:
+		var write_modes: Array = ["fileaccess.write", "fileaccess.read_write", "fileaccess.write_read"]
+		for mode in write_modes:
+			if normalized.find(str(mode)) != -1:
+				matches.append({
+					"needle": mode,
+					"code": "filesystem_write",
+					"message": "FileAccess write modes are blocked from execute_code.",
+				})
+
+	var path_rules: Array = [
+		{"needle": "user://", "code": "user_path", "message": "user:// paths are blocked from execute_code safety mode."},
+		{"needle": "../", "code": "path_traversal", "message": "Parent-directory traversal is blocked."},
+		{"needle": "\"/users/", "code": "absolute_path", "message": "Absolute user paths are blocked."},
+		{"needle": "'/users/", "code": "absolute_path", "message": "Absolute user paths are blocked."},
+		{"needle": "\"/home/", "code": "absolute_path", "message": "Absolute home paths are blocked."},
+		{"needle": "'/home/", "code": "absolute_path", "message": "Absolute home paths are blocked."},
+		{"needle": "\"/etc/", "code": "system_path", "message": "System paths are blocked."},
+		{"needle": "'/etc/", "code": "system_path", "message": "System paths are blocked."},
+		{"needle": "\"/var/", "code": "system_path", "message": "System paths are blocked."},
+		{"needle": "'/var/", "code": "system_path", "message": "System paths are blocked."},
+		{"needle": "\"/tmp/", "code": "temp_path", "message": "Temporary absolute paths are blocked."},
+		{"needle": "'/tmp/", "code": "temp_path", "message": "Temporary absolute paths are blocked."},
+		{"needle": ":" + "\\", "code": "windows_absolute_path", "message": "Windows absolute paths are blocked."},
+	]
+	for rule in path_rules:
+		var needle: String = str(rule.get("needle", ""))
+		if normalized.find(needle) != -1:
+			matches.append(rule)
+
+	return {
+		"ok": matches.is_empty(),
+		"matches": matches,
+		"override": "Pass safety_checks=false for a reviewed snippet, or use focused tools such as write_file, create_node, set_project_setting, and save_scene.",
+	}
+
+
+func _render_tool_error(code: String, error: String, data: Dictionary = {}) -> String:
+	return _render_variant({
+		"success": false,
+		"code": code,
+		"error": error,
+		"data": data,
+	})
+
+
 func _build_execute_code_context(execution_context: ExecutionContext) -> Dictionary:
 	var editor = _editor()
 	return {
@@ -2990,6 +3074,7 @@ func _build_execute_code_context(execution_context: ExecutionContext) -> Diction
 			"tool_profile": _settings.tool_profile if _settings != null else "core",
 			"server_port": _settings.server_port if _settings != null else 8765,
 			"debug_logging_enabled": _settings.debug_logging_enabled if _settings != null else false,
+			"execute_code_safety_checks_enabled": _settings.execute_code_safety_checks_enabled if _settings != null else true,
 		},
 	}
 
@@ -3493,12 +3578,13 @@ func _add_project_map_node(nodes: Array, seen_nodes: Dictionary, id: String, lab
 func _render_project_map_html(project_map: Dictionary) -> String:
 	var project: Dictionary = project_map.get("project", {})
 	var counts: Dictionary = project_map.get("counts", {})
+	var data_json: String = JSON.stringify(_json_safe(project_map)).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 	var html: Array = []
 	html.append("<!doctype html>")
 	html.append("<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>")
 	html.append("<title>%s Project Map</title>" % _html_escape(str(project.get("name", "Godot"))))
 	html.append("<style>")
-	html.append(":root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#17202a;background:#f5f7fb}body{margin:0}.wrap{max-width:1180px;margin:0 auto;padding:28px}header{display:flex;gap:20px;justify-content:space-between;align-items:flex-end;border-bottom:1px solid #dbe2ea;padding-bottom:18px;margin-bottom:18px}h1{font-size:28px;margin:0 0 6px}h2{font-size:18px;margin:26px 0 12px}.muted{color:#5d6b7a}.stats{display:flex;gap:10px;flex-wrap:wrap}.stat{background:#fff;border:1px solid #dbe2ea;border-radius:8px;padding:10px 14px;min-width:86px}.stat b{display:block;font-size:22px}.toolbar{display:flex;gap:10px;margin:18px 0}.toolbar input{width:100%;border:1px solid #cbd5df;border-radius:8px;padding:10px 12px;font-size:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}.card{background:#fff;border:1px solid #dbe2ea;border-radius:8px;padding:14px;box-shadow:0 1px 2px rgba(20,30,40,.04)}.card h3{font-size:15px;margin:0 0 8px}.pill{display:inline-block;background:#edf2f7;border-radius:999px;padding:3px 8px;font-size:12px;margin:2px;color:#334155}.path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#475569;word-break:break-all}.list{margin:8px 0 0;padding-left:18px}.list li{margin:3px 0}.hidden{display:none}")
+	html.append(":root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#17202a;background:#f5f7fb}body{margin:0}.wrap{max-width:1320px;margin:0 auto;padding:24px}header{display:flex;gap:20px;justify-content:space-between;align-items:flex-end;border-bottom:1px solid #dbe2ea;padding-bottom:16px;margin-bottom:16px}h1{font-size:28px;margin:0 0 6px}h2{font-size:16px;margin:0 0 10px}.muted{color:#5d6b7a}.stats{display:flex;gap:10px;flex-wrap:wrap}.stat{background:#fff;border:1px solid #dbe2ea;border-radius:8px;padding:10px 14px;min-width:86px}.stat b{display:block;font-size:22px}.toolbar{display:flex;gap:10px;margin:16px 0}.toolbar input{width:100%;border:1px solid #cbd5df;border-radius:8px;padding:10px 12px;font-size:14px}.layout{display:grid;grid-template-columns:minmax(360px,1.1fr) minmax(320px,.9fr);gap:14px}.panel{background:#fff;border:1px solid #dbe2ea;border-radius:8px;padding:14px;box-shadow:0 1px 2px rgba(20,30,40,.04)}#graph{width:100%;height:560px;background:#fbfdff;border:1px solid #e2e8f0;border-radius:8px}.edge{stroke:#94a3b8;stroke-width:1.5}.node{cursor:pointer}.node circle{stroke:#fff;stroke-width:2}.node text{font-size:11px;fill:#17202a;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}.node.scene circle{fill:#2563eb}.node.script circle{fill:#059669}.node.resource circle{fill:#d97706}.node.project circle{fill:#7c3aed}.node.hidden,.edge.hidden{display:none}.detail h3{margin:0 0 8px}.path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#475569;word-break:break-all}.pill{display:inline-block;background:#edf2f7;border-radius:999px;padding:3px 8px;font-size:12px;margin:2px;color:#334155}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:14px}.card{border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff}.card h3{font-size:14px;margin:0 0 6px}.list{margin:8px 0 0;padding-left:18px}.list li{margin:3px 0}.hidden{display:none}@media(max-width:900px){.layout{grid-template-columns:1fr}#graph{height:420px}header{display:block}.stats{margin-top:12px}}")
 	html.append("</style></head><body><main class='wrap'>")
 	html.append("<header><div><h1>%s</h1><div class='muted'>%s</div></div><div class='stats'>" % [
 		_html_escape(str(project.get("name", "Godot Project"))),
@@ -3509,58 +3595,16 @@ func _render_project_map_html(project_map: Dictionary) -> String:
 	html.append("<div class='stat'><b>%s</b><span>Refs</span></div>" % str(counts.get("referenced_scripts", 0)))
 	html.append("</div></header>")
 	html.append("<div class='toolbar'><input id='filter' placeholder='Filter scenes, scripts, functions, signals, or paths' oninput='filterCards(this.value)'></div>")
-	html.append("<h2>Scenes</h2><section class='grid'>")
-	for scene in project_map.get("scenes", []):
-		var scene_search: String = "%s %s" % [str(scene.get("path", "")), JSON.stringify(scene.get("scripts", []))]
-		html.append("<article class='card' data-search='%s'>" % _html_escape(scene_search.to_lower()))
-		html.append("<h3>%s</h3><div class='path'>%s</div>" % [
-			_html_escape(str(scene.get("path", "")).get_file()),
-			_html_escape(str(scene.get("path", ""))),
-		])
-		html.append("<p class='muted'>%s nodes, %s script refs</p>" % [str(scene.get("node_count", 0)), str(scene.get("scripts", []).size())])
-		for script_path in scene.get("scripts", []):
-			html.append("<span class='pill'>%s</span>" % _html_escape(str(script_path).get_file()))
-		var scene_nodes: Array = scene.get("nodes", [])
-		if scene_nodes.size() > 0:
-			html.append("<ul class='list'>")
-			for node in scene_nodes.slice(0, min(scene_nodes.size(), 8)):
-				html.append("<li>%s <span class='muted'>%s</span></li>" % [
-					_html_escape(str(node.get("name", ""))),
-					_html_escape(str(node.get("type", ""))),
-				])
-			html.append("</ul>")
-		html.append("</article>")
-	html.append("</section>")
-	html.append("<h2>Scripts</h2><section class='grid'>")
-	for script in project_map.get("scripts", []):
-		var script_functions: Array = script.get("functions", [])
-		var script_signals: Array = script.get("signals", [])
-		var class_label: String = str(script.get("class_name", ""))
-		if class_label == "":
-			class_label = str(script.get("language", ""))
-		var script_search: String = "%s %s %s %s %s" % [
-			str(script.get("path", "")),
-			str(script.get("class_name", "")),
-			str(script.get("extends", "")),
-			JSON.stringify(script_functions),
-			JSON.stringify(script_signals),
-		]
-		html.append("<article class='card' data-search='%s'>" % _html_escape(script_search.to_lower()))
-		html.append("<h3>%s</h3><div class='path'>%s</div>" % [
-			_html_escape(str(script.get("path", "")).get_file()),
-			_html_escape(str(script.get("path", ""))),
-		])
-		html.append("<p class='muted'>%s extends %s</p>" % [
-			_html_escape(class_label),
-			_html_escape(str(script.get("extends", ""))),
-		])
-		for signal_info in script_signals:
-			html.append("<span class='pill'>signal %s</span>" % _html_escape(str(signal_info.get("name", ""))))
-		for function_info in script_functions.slice(0, min(script_functions.size(), 12)):
-			html.append("<span class='pill'>%s()</span>" % _html_escape(str(function_info.get("name", ""))))
-		html.append("</article>")
-	html.append("</section>")
-	html.append("<script>function filterCards(q){q=(q||'').toLowerCase();document.querySelectorAll('.card').forEach(function(card){card.classList.toggle('hidden',q&&card.dataset.search.indexOf(q)===-1);});}</script>")
+	html.append("<section class='layout'><div class='panel'><h2>Relationship Graph</h2><svg id='graph' role='img' aria-label='Project relationship graph'></svg></div><div class='panel detail' id='detail'><h2>Details</h2><p class='muted'>Click a node in the graph or filter by name/path.</p></div></section>")
+	html.append("<section class='cards' id='cards'></section>")
+	html.append("<script id='project-data' type='application/json'>%s</script>" % data_json)
+	html.append("<script>")
+	html.append("const data=JSON.parse(document.getElementById('project-data').textContent);const graph=data.graph||{nodes:[],edges:[]};const scripts=new Map((data.scripts||[]).map(s=>[s.path,s]));const scenes=new Map((data.scenes||[]).map(s=>[s.path,s]));const svg=document.getElementById('graph');const detail=document.getElementById('detail');const cards=document.getElementById('cards');const esc=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));const labelOf=n=>n.label||String(n.path||n.id).split('/').pop();")
+	html.append("function layout(){const w=svg.clientWidth||800,h=svg.clientHeight||560,cx=w/2,cy=h/2;svg.setAttribute('viewBox',`0 0 ${w} ${h}`);const nodes=graph.nodes||[],byId=new Map(nodes.map(n=>[n.id,n]));const layers={project:0,scene:1,script:2,resource:3};const buckets={0:[],1:[],2:[],3:[]};nodes.forEach(n=>(buckets[layers[n.kind]??3]||buckets[3]).push(n));Object.keys(buckets).forEach(k=>{const arr=buckets[k],r=Math.min(w,h)*(0.12+Number(k)*0.12);arr.forEach((n,i)=>{const a=(Math.PI*2*(i/Math.max(arr.length,1)))-Math.PI/2+(Number(k)*0.35);n.x=cx+Math.cos(a)*r;n.y=cy+Math.sin(a)*r;});});svg.innerHTML='';(graph.edges||[]).forEach(e=>{const a=byId.get(e.from),b=byId.get(e.to);if(!a||!b)return;const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('x1',a.x);line.setAttribute('y1',a.y);line.setAttribute('x2',b.x);line.setAttribute('y2',b.y);line.setAttribute('class','edge');line.dataset.search=`${a.label} ${a.path} ${b.label} ${b.path} ${e.kind}`.toLowerCase();svg.appendChild(line);});nodes.forEach(n=>{const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class',`node ${n.kind}`);g.dataset.id=n.id;g.dataset.search=`${n.label} ${n.path} ${n.kind}`.toLowerCase();g.setAttribute('transform',`translate(${n.x},${n.y})`);const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');circle.setAttribute('r',n.kind==='project'?18:13);const text=document.createElementNS('http://www.w3.org/2000/svg','text');text.setAttribute('x',18);text.setAttribute('y',4);text.textContent=labelOf(n);g.appendChild(circle);g.appendChild(text);g.addEventListener('click',()=>showDetail(n));svg.appendChild(g);});}")
+	html.append("function showDetail(n){let body=`<h2>${esc(n.kind)}: ${esc(labelOf(n))}</h2><div class='path'>${esc(n.path||n.id)}</div>`;if(n.kind==='scene'){const s=scenes.get(n.path)||{};body+=`<p class='muted'>${esc(s.node_count||0)} nodes, ${(s.scripts||[]).length} script refs</p>`;body+=(s.scripts||[]).map(p=>`<span class='pill'>${esc(p.split('/').pop())}</span>`).join('');body+=`<ul class='list'>${(s.nodes||[]).slice(0,14).map(x=>`<li>${esc(x.name)} <span class='muted'>${esc(x.type)}</span></li>`).join('')}</ul>`;}else if(n.kind==='script'){const s=scripts.get(n.path)||{};body+=`<p class='muted'>${esc(s.class_name||s.language||'script')} extends ${esc(s.extends||'')}</p>`;body+=(s.signals||[]).map(x=>`<span class='pill'>signal ${esc(x.name)}</span>`).join('');body+=(s.functions||[]).slice(0,24).map(x=>`<span class='pill'>${esc(x.name)}()</span>`).join('');body+=`<ul class='list'>${(s.dependencies||[]).slice(0,16).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;}detail.innerHTML=body;}")
+	html.append("function renderCards(){const items=[...(data.scenes||[]).map(x=>({...x,kind:'scene'})),...(data.scripts||[]).map(x=>({...x,kind:'script'}))];cards.innerHTML=items.map(x=>{const title=(x.path||'').split('/').pop();const search=esc(JSON.stringify(x).toLowerCase());return `<article class='card' data-search='${search}'><h3>${esc(title)}</h3><div class='path'>${esc(x.path)}</div><p class='muted'>${x.kind}${x.node_count?`, ${x.node_count} nodes`:''}</p></article>`;}).join('');}")
+	html.append("function filterCards(q){q=(q||'').toLowerCase();document.querySelectorAll('.card').forEach(card=>card.classList.toggle('hidden',q&&card.dataset.search.indexOf(q)===-1));document.querySelectorAll('.node,.edge').forEach(el=>el.classList.toggle('hidden',q&&el.dataset.search.indexOf(q)===-1));}window.addEventListener('resize',layout);layout();renderCards();if(graph.nodes&&graph.nodes.length)showDetail(graph.nodes[0]);")
+	html.append("</script>")
 	html.append("</main></body></html>")
 	return "\n".join(html)
 

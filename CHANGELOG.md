@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.0] - 2026-06-10
+
+### Added
+- Added default-on `execute_code` safety checks with a Dock toggle and per-call `safety_checks` override
+- Added project identity hashes to MCP initialize and health responses, plus same-project attach behavior when the configured port is already owned by Funplay MCP
+- Added a Dock action and `godot://project/map.html` resource for the self-contained interactive project map visualizer
+- Added runtime bridge scene-tree snapshots and the `godot://runtime/scene_tree` resource for play-mode inspection
+
+### Changed
+- Tool errors now expose structured `success:false` MCP `structuredContent` even when legacy tools return `Error:` text
+- `map_project(format="html")` now renders a searchable SVG relationship graph with click-through scene/script details
+
 ## [0.8.0] - 2026-05-21
 
 ### Added

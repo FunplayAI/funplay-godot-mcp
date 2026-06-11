@@ -114,6 +114,8 @@ func _handle_initialize(request: Dictionary, params: Dictionary) -> Dictionary:
 			"serverInfo": {
 				"name": _server_name,
 				"version": _server_version,
+				"projectName": str(ProjectSettings.get_setting("application/config/name", "")),
+				"projectIdentity": _project_identity_hash(),
 			},
 			"capabilities": {
 				"tools": {},
@@ -138,9 +140,8 @@ func _handle_tool_call(request: Dictionary, params: Dictionary) -> Dictionary:
 		arguments = {}
 
 	var result_text = _tool_registry.call_tool(tool_name, arguments)
-	var status = "success"
-	if result_text.begins_with("Error:"):
-		status = "error"
+	var structured_content: Dictionary = _build_structured_content(result_text)
+	var status = "error" if _is_tool_error(result_text, structured_content) else "success"
 
 	if _interaction_logger.is_valid():
 		_interaction_logger.call(tool_name, status, result_text)
@@ -153,7 +154,6 @@ func _handle_tool_call(request: Dictionary, params: Dictionary) -> Dictionary:
 			"isError": status == "error",
 		},
 	}
-	var structured_content: Dictionary = _build_structured_content(result_text)
 	if not structured_content.is_empty():
 		tool_result["result"]["structuredContent"] = structured_content
 	return tool_result
@@ -165,6 +165,11 @@ func is_protocol_version_supported(version: String) -> bool:
 
 func get_default_protocol_version() -> String:
 	return SUPPORTED_PROTOCOL_VERSIONS[0]
+
+
+func _project_identity_hash() -> String:
+	var root: String = ProjectSettings.globalize_path("res://")
+	return root.sha256_text().substr(0, 16)
 
 
 func _error_response(request_id, code: int, message: String) -> Dictionary:
@@ -202,6 +207,8 @@ func _build_structured_content(result_text: String) -> Dictionary:
 	if result_text.begins_with(IMAGE_DATA_URI_PREFIX):
 		return {}
 	var trimmed: String = result_text.strip_edges()
+	if trimmed.begins_with("Error:"):
+		return _legacy_error_structured_content(trimmed)
 	if not (trimmed.begins_with("{") or trimmed.begins_with("[")):
 		return {}
 	var parsed = JSON.parse_string(trimmed)
@@ -210,3 +217,21 @@ func _build_structured_content(result_text: String) -> Dictionary:
 	if parsed is Array:
 		return {"items": parsed}
 	return {}
+
+
+func _is_tool_error(result_text: String, structured_content: Dictionary) -> bool:
+	if result_text.begins_with("Error:"):
+		return true
+	if structured_content.has("success") and not bool(structured_content.get("success")):
+		return true
+	if structured_content.has("isError") and bool(structured_content.get("isError")):
+		return true
+	return false
+
+
+func _legacy_error_structured_content(message: String) -> Dictionary:
+	return {
+		"success": false,
+		"code": "TOOL_ERROR",
+		"error": message.trim_prefix("Error:").strip_edges(),
+	}

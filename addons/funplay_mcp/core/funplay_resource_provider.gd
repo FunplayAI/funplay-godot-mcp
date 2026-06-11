@@ -41,6 +41,12 @@ func list_resources() -> Array:
 			"mimeType": "application/json",
 		},
 		{
+			"uri": "godot://project/map.html",
+			"name": "Project Map HTML",
+			"description": "Self-contained read-only HTML project visualizer.",
+			"mimeType": "text/html",
+		},
+		{
 			"uri": "godot://scene/current",
 			"name": "Current Scene",
 			"description": "Structured view of the currently edited scene tree.",
@@ -86,6 +92,12 @@ func list_resources() -> Array:
 			"uri": "godot://runtime/bridge",
 			"name": "Runtime Bridge",
 			"description": "Runtime bridge install status and latest play-mode heartbeat state.",
+			"mimeType": "application/json",
+		},
+		{
+			"uri": "godot://runtime/scene_tree",
+			"name": "Runtime Scene Tree",
+			"description": "Latest play-mode scene tree snapshot written by the runtime bridge.",
 			"mimeType": "application/json",
 		},
 		{
@@ -188,6 +200,8 @@ func read_resource(uri: String) -> Dictionary:
 		return _content_response(uri, _core_tools.get_project_info({}), "application/json")
 	if uri == "godot://project/map":
 		return _content_response(uri, _core_tools.map_project({"format": "json", "max_files": 300, "max_script_members": 60}), "application/json")
+	if uri == "godot://project/map.html":
+		return _content_response(uri, _core_tools.map_project({"format": "html", "max_files": 500, "max_script_members": 120}), "text/html")
 	if uri == "godot://scene/current":
 		return _content_response(uri, _core_tools.get_scene_tree({}), "application/json")
 	if uri == "godot://selection/current":
@@ -204,6 +218,8 @@ func read_resource(uri: String) -> Dictionary:
 		return _content_response(uri, _core_tools.get_capability_status({}), "application/json")
 	if uri == "godot://runtime/bridge":
 		return _content_response(uri, _core_tools.get_runtime_bridge_status({}), "application/json")
+	if uri == "godot://runtime/scene_tree":
+		return _content_response(uri, _runtime_scene_tree(), "application/json")
 	if uri == "godot://workflow/coverage":
 		return _content_response(uri, _core_tools.list_workflow_coverage({}), "application/json")
 	if uri == "godot://logs/recent":
@@ -276,6 +292,34 @@ func _read_project_file(relative_path: String) -> String:
 		return "Error: Failed to open file: %s" % path
 
 	return file.get_as_text()
+
+
+func _runtime_scene_tree() -> String:
+	var parsed = JSON.parse_string(_core_tools.get_runtime_bridge_status({}))
+	if not (parsed is Dictionary):
+		return JSON.stringify({"available": false, "error": "Runtime bridge status is unavailable."}, "\t")
+	var state: Dictionary = {}
+	var state_value = parsed.get("state", {})
+	if state_value is Dictionary:
+		state = state_value
+	if state.is_empty() or not state.has("scene_tree"):
+		return JSON.stringify({
+			"available": false,
+			"installed": bool(parsed.get("installed", false)),
+			"state_exists": bool(parsed.get("state_exists", false)),
+			"message": "Install the runtime bridge and enter play mode to populate scene_tree.",
+		}, "\t")
+	return JSON.stringify({
+		"available": true,
+		"timestamp": state.get("timestamp", ""),
+		"status": state.get("status", ""),
+		"fps": state.get("fps", 0),
+		"time_scale": state.get("time_scale", 1.0),
+		"paused": state.get("paused", false),
+		"current_scene": state.get("current_scene"),
+		"scene_tree": state.get("scene_tree"),
+		"truncated": bool(state.get("scene_tree_truncated", false)),
+	}, "\t")
 
 
 func _template_catalog() -> Array:

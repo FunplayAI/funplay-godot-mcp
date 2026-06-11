@@ -172,22 +172,23 @@ Open your AI client and try: *"Create a 2D HUD with health bar, score label, and
 ## Before You Start
 
 - This addon is **Editor-only**. It does not add runtime components to your exported game.
-- The MCP server starts on `http://127.0.0.1:8765/` by default, but automatically falls back to another free local port if needed.
+- The MCP server starts on `http://127.0.0.1:8765/` by default. If the same project already owns that port, the dock attaches to it; otherwise it falls back to another free local port.
 - Local MCP server settings are stored in `user://funplay_mcp_settings.cfg`.
 - The addon defaults to the `core` MCP tool profile to reduce tool-list noise for AI clients. Switch to `full` in the dock if you want the complete tool surface.
-- The dock includes a Tool Exposure panel for disabling individual tools within the active profile, plus an optional debug logging toggle for MCP activity.
+- The dock includes a Tool Exposure panel for disabling individual tools within the active profile, plus optional debug logging and `execute_code` safety toggles.
+- `execute_code` safety checks are on by default for common process, filesystem, and project-setting mutations. A reviewed call can pass `safety_checks=false`.
 - The dock can check GitHub Releases for newer addon versions.
-- All exposed MCP tools run directly. There is no extra approval toggle inside the addon.
+- Focused MCP tools run directly. There is no extra approval toggle inside the addon.
 - The built-in dock can copy or write recommended MCP config entries for Codex, Claude Code, Cursor, and VS Code.
 
 ## Why This Project
 
-- **`execute_code` First** — The addon is optimized around one high-flexibility GDScript execution tool for rich editor/runtime orchestration when many small tools would be noisy
+- **`execute_code` First** — The addon is optimized around one high-flexibility GDScript execution tool for rich editor/runtime orchestration, now with default-on safety checks for risky snippets
 - **Tool Exposure Control** — Toggle individual tools from the Godot dock without editing addon code or restarting the project
 - **Project Skills** — Generate project-local AI guidance files that capture the current endpoint, tool profile, project context, and recommended Funplay workflow
 - **Tool Catalog & Help** — Query grouped tool catalogs, capability gates, workflow coverage, and task-specific guidance from MCP
-- **Project Map & Templates** — Inspect scenes, scripts, functions, signals, and usage links, then ask for architecture, performance, networking, UI, asset, or update-safety templates
-- **Runtime Bridge** — Optionally install a lightweight autoload that writes play-mode heartbeat state for AI-driven runtime validation
+- **Project Map & Templates** — Inspect scenes, scripts, functions, signals, usage links, and a searchable browser graph, then ask for architecture, performance, networking, UI, asset, or update-safety templates
+- **Runtime Bridge** — Optionally install a lightweight autoload that writes play-mode heartbeat and scene-tree snapshots for AI-driven runtime validation
 - **Play Mode Automation** — Enter play mode, simulate input, inspect logs, capture editor views, and validate behavior from the same MCP session
 - **Project Context Built In** — Exposes live resources for project state, active scene, selection, play state, script errors, logs, and MCP interaction history
 - **Focused by Default, Full When Needed** — `core` exposes a compact high-signal toolset; `full` exposes a broader editor automation surface
@@ -197,8 +198,8 @@ Open your AI client and try: *"Create a 2D HUD with health bar, score label, and
 ## Highlights
 
 - **120 Built-in Tools** — Scene editing, PackedScene workflows, language-aware script tools, project maps, project settings, input map, autoloads, runtime bridge, undo/redo, workflow guidance, files, project skills, play mode control, UI controls, animation, camera, performance, resources, prompts, and editor automation
-- **Resources & Prompts** — Live project context, project maps, scene/selection/error resources, language-aware script diagnostics, `.NET` project resources when applicable, template resources, and reusable workflow prompts
-- **Structured Results** — JSON tool outputs are mirrored into MCP `structuredContent`, and node/resource summaries include session `instance_id` values for follow-up calls
+- **Resources & Prompts** — Live project context, JSON and HTML project maps, runtime scene-tree snapshots, scene/selection/error resources, language-aware script diagnostics, `.NET` project resources when applicable, template resources, and reusable workflow prompts
+- **Structured Results** — JSON tool outputs and tool errors are mirrored into MCP `structuredContent`, and node/resource summaries include session `instance_id` values for follow-up calls
 - **Input Simulation + View Capture** — Drive play mode with action/key/mouse simulation and verify results with captured editor views
 - **One-Click Client Configuration** — Generate MCP config entries for Codex, Claude Code, Cursor, and VS Code directly from the Godot dock
 - **Release + Registry Ready** — GitHub Release artifacts are generated with manifests and SHA256 sums, Godot Asset Library packaging notes are included, and the npm stdio wrapper is described by `server.json` for MCP Registry publication
@@ -215,7 +216,7 @@ The table below compares this repository with the public behavior and positionin
 | Extra local prerequisites | Godot addon only for core workflows | Unity package only for core workflows |
 | Primary workflow style | `execute_code` first, then focused helper tools | `execute_code` first, then focused helper tools |
 | Default tool exposure | Compact `core` profile with optional `full` expansion | Compact `core` profile with optional `full` expansion |
-| Built-in context model | Project resources, script error summary, play state, logs, prompts, interaction history | Project resources, compile errors, play state, logs, prompts, interaction history |
+| Built-in context model | Project resources, script error summary, play state, runtime scene tree, logs, prompts, interaction history | Project resources, compile errors, play state, logs, prompts, interaction history |
 | UI automation | Deep Godot `Control` / `CanvasLayer` workflows | Unity Canvas / UI helpers |
 | Positioning | Lightweight, direct, MIT-licensed Godot MCP server for AI-driven editor control | Lightweight, direct, MIT-licensed Unity MCP server for AI-driven editor control |
 
@@ -224,9 +225,9 @@ The table below compares this repository with the public behavior and positionin
 The current open-source package exposes four high-value capability layers:
 
 - **Tools** — 120 total registered tools across scene editing, scripts, project maps, project configuration, input map, autoloads, runtime bridge, undo/redo, workflow guidance, files, project skills, UI, animation, camera, diagnostics, and automation. Script-related tools are filtered by detected project language and the dock's Tool Exposure settings.
-- **Primary execution** — `execute_code` for rich editor/runtime orchestration, with optional object-style context helpers, logs, and change tracking metadata
+- **Primary execution** — `execute_code` for rich editor/runtime orchestration, with default-on safety checks, optional object-style context helpers, logs, and change tracking metadata
 - **Prompts** — workflow prompts like `scene_review`, `feature_plan`, `runtime_debug`, `script_patch`, `ui_layout_plan`, `architecture_advice`, `performance_advice`, `network_template`, and `template_generate`
-- **Resources** — project context, project map, scene summaries, selection state, logs, script errors, play state, project features, MCP interaction history, template catalog, and file templates
+- **Resources** — project context, project map JSON/HTML, scene summaries, selection state, logs, script errors, play state, runtime scene tree, project features, MCP interaction history, template catalog, and file templates
 
 ## Built-in Tools
 

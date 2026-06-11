@@ -172,22 +172,23 @@ MCP 客户端配置示例：
 ## 开始前说明
 
 - 这是一个 **仅限 Editor** 的插件，不会向最终导出游戏添加运行时代码。
-- MCP Server 默认从 `http://127.0.0.1:8765/` 启动；如果端口被占用，会自动切换到其他可用本地端口。
+- MCP Server 默认从 `http://127.0.0.1:8765/` 启动；如果同一项目已经占用该端口，Dock 会直接附着到现有服务，否则会自动切换到其他可用本地端口。
 - 本地 MCP Server 配置保存在 `user://funplay_mcp_settings.cfg`。
 - 插件默认使用 `core` MCP 工具暴露配置，减少 AI 客户端的工具噪音；如果你需要完整工具面，可在 Dock 中切换到 `full`。
-- Dock 里提供 Tool Exposure 面板，可以在当前 profile 内逐个开关工具，也可以打开 MCP 调试日志输出。
+- Dock 里提供 Tool Exposure 面板，可以在当前 profile 内逐个开关工具，也可以打开 MCP 调试日志输出和 `execute_code` 安全检查。
+- `execute_code` 默认会拦截常见的进程、文件系统和项目设置写入风险；确认过的调用可以传入 `safety_checks=false` 覆盖。
 - Dock 可以检查 GitHub Releases 中是否有新版本。
-- 所有已暴露的 MCP 工具都会直接执行，不再提供额外 approval 开关。
+- 聚焦型 MCP 工具会直接执行，不再提供额外 approval 开关。
 - Dock 内置 Codex、Claude Code、Cursor、VS Code 的配置复制和直接写入能力。
 
 ## 为什么做这个项目
 
-- **`execute_code` 主工具优先** — 核心体验围绕一个高灵活度 GDScript 执行工具构建，适合复杂编辑器/运行态编排
+- **`execute_code` 主工具优先** — 核心体验围绕一个高灵活度 GDScript 执行工具构建，适合复杂编辑器/运行态编排，并默认开启高风险片段安全检查
 - **工具暴露可控** — 可以直接在 Godot Dock 中开关单个工具，不需要改插件代码
 - **Project Skills** — 可生成项目级 AI 使用说明，记录当前 endpoint、工具 profile、项目上下文和推荐工作流
 - **工具目录与帮助** — 可通过 MCP 查询分组工具目录、能力门禁、工作流覆盖矩阵和任务指引
-- **项目地图与模板** — 检查场景、脚本、函数、信号和引用关系，并生成架构、性能、网络、UI、资产和更新安全模板
-- **Runtime Bridge** — 可选安装轻量 autoload，在 Play Mode 中持续写入运行态 heartbeat 状态，方便 AI 验证
+- **项目地图与模板** — 检查场景、脚本、函数、信号、引用关系和可搜索浏览器图谱，并生成架构、性能、网络、UI、资产和更新安全模板
+- **Runtime Bridge** — 可选安装轻量 autoload，在 Play Mode 中持续写入运行态 heartbeat 和场景树快照，方便 AI 验证
 - **Play Mode 自动化闭环** — 进入运行模式、模拟输入、查看日志、截图、验证行为都能在同一 MCP 会话里完成
 - **内建项目上下文** — 直接提供项目状态、当前场景、选择对象、运行状态、脚本错误、日志和 MCP 交互记录资源
 - **默认聚焦，必要时全量** — 默认 `core` 工具集更利于 AI 选工具，需要时可切到 `full`
@@ -197,8 +198,8 @@ MCP 客户端配置示例：
 ## 核心特性
 
 - **120 个内置工具** — 覆盖场景编辑、PackedScene、语言感知脚本工具、项目地图、项目设置、InputMap、autoload、Runtime Bridge、Undo/Redo、工作流指引、文件、Project Skills、运行态控制、UI 控件、动画、相机、性能、Resources、Prompts 与编辑器自动化
-- **Resources 与 Prompts** — 暴露实时项目上下文、项目地图、场景/选择/错误资源、语言感知脚本诊断、适用时的 `.NET` 项目资源、模板资源，以及常见 Godot 工作流的可复用 MCP Prompt
-- **结构化返回** — JSON 工具输出会同步到 MCP `structuredContent`，节点和资源摘要也包含当前会话可用的 `instance_id`
+- **Resources 与 Prompts** — 暴露实时项目上下文、JSON/HTML 项目地图、运行态场景树快照、场景/选择/错误资源、语言感知脚本诊断、适用时的 `.NET` 项目资源、模板资源，以及常见 Godot 工作流的可复用 MCP Prompt
+- **结构化返回** — JSON 工具输出和工具错误都会同步到 MCP `structuredContent`，节点和资源摘要也包含当前会话可用的 `instance_id`
 - **输入模拟 + 视图截图验证** — 在 Play Mode 中模拟 action / 键盘 / 鼠标 / 拖拽，再用编辑器视图截图验证结果
 - **一键客户端配置** — 直接在 Godot Dock 中为 Codex、Claude Code、Cursor、VS Code 生成并写入 MCP 配置
 - **发布与 Registry 就绪** — GitHub Release 产物会生成 manifest 和 SHA256 校验，已补 Godot Asset Library 打包说明，npm stdio wrapper 也通过 `server.json` 描述，可用于 MCP Registry 发布
@@ -215,7 +216,7 @@ MCP 客户端配置示例：
 | 额外本地依赖 | `core` 工作流下只需要 Godot Addon 本身 | `core` 工作流下只需要 Unity 包本身 |
 | 主要交互模型 | 以 `execute_code` 为主，再配合少量高频辅助工具 | 以 `execute_code` 为主，再配合少量高频辅助工具 |
 | 默认工具暴露 | 默认 `core` 精简工具集，可切 `full` | 默认 `core` 精简工具集，可切 `full` |
-| 上下文能力 | 项目资源、脚本错误、运行状态、日志、Prompts、交互历史 | 项目资源、编译错误、运行状态、日志、Prompts、交互历史 |
+| 上下文能力 | 项目资源、脚本错误、运行状态、运行态场景树、日志、Prompts、交互历史 | 项目资源、编译错误、运行状态、日志、Prompts、交互历史 |
 | UI 自动化 | 深度支持 Godot `Control` / `CanvasLayer` 工作流 | 深度支持 Unity Canvas / UI 工作流 |
 | 定位 | 轻量、直接、MIT 协议的 Godot MCP 服务器 | 轻量、直接、MIT 协议的 Unity MCP 服务器 |
 
@@ -224,9 +225,9 @@ MCP 客户端配置示例：
 当前开源包有四层高价值能力：
 
 - **Tools** — 共 120 个注册工具，覆盖场景、脚本、项目地图、项目配置、输入映射、autoload、Runtime Bridge、Undo/Redo、工作流指引、文件、Project Skills、UI、动画、相机、诊断与自动化。脚本相关工具会按检测到的项目语言和 Dock 中的 Tool Exposure 设置过滤。
-- **Primary execution** — `execute_code` 用于复杂编辑器/运行态编排，并可返回上下文辅助 API、日志和变更追踪 metadata
+- **Primary execution** — `execute_code` 用于复杂编辑器/运行态编排，默认带安全检查，并可返回上下文辅助 API、日志和变更追踪 metadata
 - **Prompts** — 包括 `scene_review`、`feature_plan`、`runtime_debug`、`script_patch`、`ui_layout_plan`、`architecture_advice`、`performance_advice`、`network_template`、`template_generate` 等工作流 Prompt
-- **Resources** — 项目上下文、项目地图、场景摘要、选择状态、日志、脚本错误、运行状态、项目特性、MCP 交互记录、模板目录，以及文件模板资源
+- **Resources** — 项目上下文、JSON/HTML 项目地图、场景摘要、选择状态、日志、脚本错误、运行状态、运行态场景树、项目特性、MCP 交互记录、模板目录，以及文件模板资源
 
 ## 内置工具
 
