@@ -1,27 +1,21 @@
 # Changelog
 
-## [0.10.0] - 2026-06-11
-
-### Added
-- Added `plan_script_refactor` for dry-run script rename/replace previews with per-file match snippets
-- Added `apply_script_refactor` for confirmed batch refactors with optional backup files
-- Added `plan_asset_import` for safe CC0/permissive asset import paths and optional license manifest creation
-- Added `get_release_readiness` and `godot://release/readiness` for version, npm wrapper, MCP Registry, Asset Library, and validation checks
-
-### Changed
-- Expanded workflow coverage toward P2/P3 productization, refactor planning, asset pipeline, and release readiness workflows
-
-## [0.9.0] - 2026-06-10
+## [0.9.0] - 2026-06-11
 
 ### Added
 - Added default-on `execute_code` safety checks with a Dock toggle and per-call `safety_checks` override
 - Added project identity hashes to MCP initialize and health responses, plus same-project attach behavior when the configured port is already owned by Funplay MCP
 - Added a Dock action and `godot://project/map.html` resource for the self-contained interactive project map visualizer
 - Added runtime bridge scene-tree snapshots and the `godot://runtime/scene_tree` resource for play-mode inspection
+- Added `plan_script_refactor` for dry-run script rename/replace previews with per-file match snippets
+- Added `apply_script_refactor` for confirmed batch refactors with optional backup files
+- Added `plan_asset_import` for safe CC0/permissive asset import paths and optional license manifest creation
+- Added `get_release_readiness` and `godot://release/readiness` for version, npm wrapper, MCP Registry, Asset Library, and validation checks
 
 ### Changed
 - Tool errors now expose structured `success:false` MCP `structuredContent` even when legacy tools return `Error:` text
 - `map_project(format="html")` now renders a searchable SVG relationship graph with click-through scene/script details
+- Expanded workflow coverage toward P2/P3 productization, refactor planning, asset pipeline, and release readiness workflows
 
 ## [0.8.0] - 2026-05-21
 
