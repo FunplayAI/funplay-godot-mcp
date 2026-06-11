@@ -438,6 +438,85 @@ func find_usages(arguments: Dictionary) -> String:
 	})
 
 
+func plan_script_refactor(arguments: Dictionary) -> String:
+	var plan: Dictionary = _build_script_refactor_plan(arguments)
+	if not bool(plan.get("success", false)):
+		return _render_tool_error("SCRIPT_REFACTOR_INVALID", str(plan.get("error", "Invalid script refactor request.")), plan)
+	return _render_variant(plan)
+
+
+func apply_script_refactor(arguments: Dictionary) -> String:
+	var plan: Dictionary = _build_script_refactor_plan(arguments)
+	if not bool(plan.get("success", false)):
+		return _render_tool_error("SCRIPT_REFACTOR_INVALID", str(plan.get("error", "Invalid script refactor request.")), plan)
+	if not bool(arguments.get("apply", false)) or not bool(arguments.get("confirm", false)):
+		plan["applied"] = false
+		plan["required_flags"] = {"apply": true, "confirm": true}
+		return _render_tool_error(
+			"SCRIPT_REFACTOR_NOT_CONFIRMED",
+			"Refactor was not applied. Re-run with apply=true and confirm=true after reviewing the plan.",
+			plan
+		)
+
+	var create_backup: bool = bool(arguments.get("create_backup", false))
+	var changed_files: Array = []
+	var backup_files: Array = []
+	var errors: Array = []
+	var total_replacements: int = 0
+	var find_text: String = str(plan.get("find_text", ""))
+	var replace_text: String = str(plan.get("replace_text", ""))
+	var case_sensitive: bool = bool(plan.get("case_sensitive", true))
+	var token_boundaries: bool = str(plan.get("operation", "")) == "rename_symbol"
+
+	for file_plan in plan.get("files", []):
+		if not (file_plan is Dictionary):
+			continue
+		var path: String = str(file_plan.get("path", ""))
+		if path == "" or int(file_plan.get("match_count", 0)) <= 0:
+			continue
+		var content: String = FileAccess.get_file_as_string(path)
+		if content == "":
+			if not FileAccess.file_exists(path):
+				errors.append({"path": path, "error": "File no longer exists."})
+				continue
+		var updated: String = _replace_refactor_text(content, find_text, replace_text, case_sensitive, token_boundaries)
+		if updated == content:
+			continue
+		if create_backup:
+			var backup_path: String = "%s.funplaybak" % path
+			var backup_file: FileAccess = FileAccess.open(backup_path, FileAccess.WRITE)
+			if backup_file == null:
+				errors.append({"path": backup_path, "error": "Failed to write backup."})
+				continue
+			backup_file.store_string(content)
+			backup_files.append(backup_path)
+		var output: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+		if output == null:
+			errors.append({"path": path, "error": "Failed to open file for writing."})
+			continue
+		output.store_string(updated)
+		total_replacements += int(file_plan.get("match_count", 0))
+		changed_files.append({
+			"path": path,
+			"replacements": int(file_plan.get("match_count", 0)),
+		})
+
+	_refresh_filesystem()
+	return _render_variant({
+		"success": errors.is_empty(),
+		"applied": errors.is_empty(),
+		"operation": plan.get("operation", ""),
+		"find_text": find_text,
+		"replace_text": replace_text,
+		"changed_file_count": changed_files.size(),
+		"total_replacements": total_replacements,
+		"changed_files": changed_files,
+		"backup_files": backup_files,
+		"errors": errors,
+		"plan": plan,
+	})
+
+
 func list_scenes(arguments: Dictionary) -> String:
 	var root_path = _normalize_path(str(arguments.get("path", "res://")))
 	var max_entries = clamp(int(arguments.get("max_entries", 300)), 1, 3000)
@@ -2317,6 +2396,97 @@ func list_project_features(_arguments: Dictionary) -> String:
 	})
 
 
+func plan_asset_import(arguments: Dictionary) -> String:
+	var target_root: String = _normalize_path(str(arguments.get("target_root", "res://assets/imported")))
+	if not target_root.begins_with("res://"):
+		return "Error: 'target_root' must be under res://."
+
+	var source_slug: String = _slug_name(str(arguments.get("source", "external")), "external")
+	var package_slug: String = _slug_name(str(arguments.get("package_name", "asset_pack")), "asset_pack")
+	var license_text: String = str(arguments.get("license", "CC0-1.0")).strip_edges()
+	if license_text == "":
+		license_text = "CC0-1.0"
+	var package_path: String = target_root.path_join(source_slug).path_join(package_slug).simplify_path()
+	var manifest_path: String = package_path.path_join("funplay_asset_manifest.json")
+	var raw_assets = arguments.get("assets", [])
+	var asset_entries: Array = []
+	if raw_assets is Array:
+		for index in range(raw_assets.size()):
+			var raw_asset = raw_assets[index]
+			var entry: Dictionary = {}
+			if raw_asset is Dictionary:
+				entry = raw_asset
+			else:
+				entry = {"name": str(raw_asset)}
+			var asset_name: String = _slug_name(str(entry.get("name", "asset_%03d" % index)), "asset_%03d" % index)
+			var file_name: String = str(entry.get("file", entry.get("filename", asset_name))).strip_edges()
+			if file_name == "":
+				file_name = asset_name
+			file_name = file_name.replace("\\", "/").get_file()
+			asset_entries.append({
+				"name": asset_name,
+				"file": file_name,
+				"target_path": package_path.path_join(file_name).simplify_path(),
+				"url": str(entry.get("url", "")),
+				"source_page": str(entry.get("source_page", "")),
+				"license": str(entry.get("license", license_text)),
+				"attribution": str(entry.get("attribution", "")),
+			})
+
+	var manifest: Dictionary = {
+		"generated_by": "Funplay MCP for Godot",
+		"source": source_slug,
+		"package_name": package_slug,
+		"license": license_text,
+		"target_root": target_root,
+		"package_path": package_path,
+		"notes": str(arguments.get("notes", "")),
+		"assets": asset_entries,
+		"safety": {
+			"network_downloaded_by_core_tool": false,
+			"overwrite_default": false,
+			"recommended_sources": ["Kenney", "OpenGameArt", "Godot Asset Library", "itch.io assets with explicit permissive license"],
+			"required_review": ["license", "attribution", "source URL", "file names", "import path"],
+		},
+	}
+	var created_directories: Array = []
+	if bool(arguments.get("create_directories", false)):
+		var err: int = DirAccess.make_dir_recursive_absolute(package_path)
+		if err != OK:
+			return "Error: Failed to create asset import directory %s (code %s)." % [package_path, str(err)]
+		created_directories.append(package_path)
+
+	var manifest_written: bool = false
+	if bool(arguments.get("write_manifest", false)):
+		if FileAccess.file_exists(manifest_path) and not bool(arguments.get("overwrite_manifest", false)):
+			return "Error: Manifest already exists: %s. Pass overwrite_manifest=true to replace it." % manifest_path
+		var ensure_err: int = _ensure_parent_dir(manifest_path)
+		if ensure_err != OK:
+			return "Error: Failed to create manifest directory for %s." % manifest_path
+		var file: FileAccess = FileAccess.open(manifest_path, FileAccess.WRITE)
+		if file == null:
+			return "Error: Failed to write manifest: %s" % manifest_path
+		file.store_string(JSON.stringify(_json_safe(manifest), "\t") + "\n")
+		manifest_written = true
+		_refresh_filesystem()
+
+	return _render_variant({
+		"success": true,
+		"package_path": package_path,
+		"manifest_path": manifest_path,
+		"manifest_written": manifest_written,
+		"created_directories": created_directories,
+		"asset_count": asset_entries.size(),
+		"assets": asset_entries,
+		"manifest": manifest,
+		"next_steps": [
+			"Download or copy reviewed assets into the planned target_path entries.",
+			"Keep the manifest with license, source URL, and attribution data.",
+			"Run Godot filesystem scan or reopen the project after importing files.",
+		],
+	})
+
+
 func list_project_settings(arguments: Dictionary) -> String:
 	var prefix = str(arguments.get("prefix", "")).strip_edges()
 	var include_internal = bool(arguments.get("include_internal", false))
@@ -2825,12 +2995,36 @@ func funplay_help(arguments: Dictionary) -> String:
 				"Use get_editor_protocol_status to inspect Godot LSP/DAP editor settings when IDE integration looks stale.",
 			],
 		},
+		"refactor": {
+			"title": "Script refactor workflow",
+			"steps": [
+				"Call plan_script_refactor first to preview affected files, line numbers, and replacement snippets.",
+				"Review the plan and use find_usages when the symbol boundary or call sites need a second look.",
+				"Call apply_script_refactor only with apply=true and confirm=true, then validate_script or get_script_errors.",
+			],
+		},
 		"ui": {
 			"title": "Godot Control UI workflow",
 			"steps": [
 				"Use ui_layout_plan prompt or get_scene_tree to plan placement.",
 				"Create a UI root, add controls/containers, apply layout presets, then set text/theme/texture overrides.",
 				"Capture the editor view or run play-mode checks to verify the UI.",
+			],
+		},
+		"assets": {
+			"title": "Asset import workflow",
+			"steps": [
+				"Use plan_asset_import to create safe res://assets/imported/<source>/<package>/ paths and a license manifest plan.",
+				"Only use assets with reviewed license, source URL, attribution, and file names.",
+				"After copying assets into the planned paths, rescan the filesystem and keep the manifest with the imported files.",
+			],
+		},
+		"release": {
+			"title": "Release readiness workflow",
+			"steps": [
+				"Call get_release_readiness or read godot://release/readiness before tagging.",
+				"Run the listed validation and package commands, then create the git tag and GitHub Release.",
+				"Publish the npm stdio wrapper and submit server.json to MCP Registry after package validation passes.",
 			],
 		},
 	}
@@ -2867,6 +3061,9 @@ func get_capability_status(_arguments: Dictionary) -> String:
 			"resources": true,
 			"prompts": true,
 			"execute_code_safety_checks": _settings.execute_code_safety_checks_enabled if _settings != null else true,
+			"script_refactor_planning": _tool_registry != null and _tool_registry.has_tool("plan_script_refactor"),
+			"asset_import_planning": _tool_registry != null and _tool_registry.has_tool("plan_asset_import"),
+			"release_readiness": _tool_registry != null and _tool_registry.has_tool("get_release_readiness"),
 			"scene_open": scene_root != null,
 			"play_mode": editor.has_method("is_playing_scene"),
 			"dotnet": language_mode == "dotnet" or language_mode == "mixed",
@@ -2883,6 +3080,79 @@ func get_capability_status(_arguments: Dictionary) -> String:
 
 func get_editor_protocol_status(_arguments: Dictionary) -> String:
 	return _render_variant(_build_editor_protocol_status())
+
+
+func get_release_readiness(arguments: Dictionary) -> String:
+	var plugin_version: String = _read_plugin_version()
+	var requested_version: String = str(arguments.get("version", plugin_version)).strip_edges().trim_prefix("v")
+	if requested_version == "":
+		requested_version = plugin_version
+	var server_version: String = _read_server_version()
+	var server_json: Dictionary = _read_json_file("res://server.json")
+	var wrapper_json: Dictionary = _read_json_file("res://stdio-wrapper/package.json")
+	var changelog: String = _read_text_if_exists("res://CHANGELOG.md")
+	var readme: String = _read_text_if_exists("res://README.md")
+	var readme_cn: String = _read_text_if_exists("res://README_CN.md")
+	var tool_count: int = 0
+	if _tool_registry != null and _tool_registry.has_method("get_tool_catalog"):
+		var catalog: Dictionary = _tool_registry.get_tool_catalog("full", "", true)
+		tool_count = int(catalog.get("tool_count", 0))
+
+	var checks: Array = []
+	_add_readiness_check(checks, "plugin_version", plugin_version == requested_version, "plugin.cfg version is %s" % plugin_version)
+	_add_readiness_check(checks, "server_version", server_version == requested_version, "SERVER_VERSION is %s" % server_version)
+	_add_readiness_check(checks, "changelog_section", changelog.contains("## [%s]" % requested_version), "CHANGELOG.md has release section for %s" % requested_version)
+	_add_readiness_check(checks, "server_json_version", str(server_json.get("version", "")) == requested_version, "server.json version is %s" % str(server_json.get("version", "")))
+	var packages = server_json.get("packages", [])
+	var package_version: String = ""
+	if packages is Array and packages.size() > 0 and packages[0] is Dictionary:
+		package_version = str(packages[0].get("version", ""))
+	_add_readiness_check(checks, "mcp_registry_package", package_version == requested_version, "server.json npm package version is %s" % package_version)
+	_add_readiness_check(checks, "stdio_wrapper_version", str(wrapper_json.get("version", "")) == requested_version, "stdio-wrapper package version is %s" % str(wrapper_json.get("version", "")))
+	_add_readiness_check(checks, "stdio_wrapper_bin", FileAccess.file_exists("res://stdio-wrapper/bin/funplay-godot-mcp.js"), "stdio wrapper bin exists")
+	_add_readiness_check(checks, "asset_library_notes", FileAccess.file_exists("res://ASSET_LIBRARY.md"), "ASSET_LIBRARY.md exists")
+	_add_readiness_check(checks, "release_checklist", FileAccess.file_exists("res://RELEASE_CHECKLIST.md"), "RELEASE_CHECKLIST.md exists")
+	_add_readiness_check(checks, "documented_tool_count_en", _readme_mentions_tool_count(readme, tool_count), "README.md documents %s tools" % str(tool_count))
+	_add_readiness_check(checks, "documented_tool_count_cn", _readme_mentions_tool_count(readme_cn, tool_count), "README_CN.md documents %s tools" % str(tool_count))
+
+	var ready: bool = true
+	for check in checks:
+		if check is Dictionary and str(check.get("status", "")) != "pass":
+			ready = false
+			break
+
+	var result: Dictionary = {
+		"ready": ready,
+		"version": requested_version,
+		"detected": {
+			"plugin_version": plugin_version,
+			"server_version": server_version,
+			"server_json_version": server_json.get("version", ""),
+			"stdio_wrapper_version": wrapper_json.get("version", ""),
+			"tool_count": tool_count,
+		},
+		"checks": checks,
+		"release_targets": {
+			"github_tag": "v%s" % requested_version,
+			"github_release": "https://github.com/FunplayAI/funplay-godot-mcp/releases/tag/v%s" % requested_version,
+			"npm_package": "funplay-godot-mcp@%s" % requested_version,
+			"mcp_registry_name": "io.github.FunplayAI/funplay-godot-mcp",
+			"godot_asset_library": FileAccess.file_exists("res://ASSET_LIBRARY.md"),
+		},
+	}
+	if bool(arguments.get("include_commands", true)):
+		result["commands"] = [
+			"python3 scripts/validate_repo.py",
+			"python3 -m py_compile scripts/validate_repo.py scripts/package_release.py",
+			"node --check stdio-wrapper/bin/funplay-godot-mcp.js",
+			"python3 scripts/package_release.py --version %s" % requested_version,
+			"python3 scripts/package_release.py --verify-zip dist/v%s/Funplay.GodotMcp.v%s.zip" % [requested_version, requested_version],
+			"git tag v%s && git push origin v%s" % [requested_version, requested_version],
+			"gh release create v%s dist/v%s/* --notes-file dist/v%s/release-notes.md" % [requested_version, requested_version, requested_version],
+			"npm publish ./stdio-wrapper --access public",
+			"mcp-publisher publish",
+		]
+	return _render_variant(result)
 
 
 func get_undo_redo_status(_arguments: Dictionary) -> String:
@@ -2971,9 +3241,12 @@ func list_workflow_coverage(_arguments: Dictionary) -> String:
 			_build_coverage_item("Project orientation", ["get_project_info", "get_scene_tree", "list_tool_catalog", "funplay_help"], exposed_tools),
 			_build_coverage_item("Scene and node editing", ["create_node", "set_node_property", "set_transform_2d", "save_scene", "editor_undo"], exposed_tools),
 			_build_coverage_item("Script editing and diagnostics", ["read_file", "patch_script", "validate_script", "get_script_errors", "get_editor_protocol_status"], exposed_tools),
+			_build_coverage_item("Script refactor planning", ["plan_script_refactor", "apply_script_refactor", "find_usages", "validate_script"], exposed_tools),
 			_build_coverage_item("Runtime validation", ["enter_play_mode", "simulate_action", "get_runtime_bridge_status", "get_console_logs"], exposed_tools),
 			_build_coverage_item("UI authoring", ["create_ui_root", "create_control", "set_control_layout", "set_control_text"], exposed_tools),
+			_build_coverage_item("Asset import planning", ["plan_asset_import", "select_file", "request_script_reload"], exposed_tools),
 			_build_coverage_item("Project configuration", ["list_project_settings", "set_project_setting", "list_input_actions", "list_autoloads"], exposed_tools),
+			_build_coverage_item("Release readiness", ["get_release_readiness", "list_tool_catalog", "get_capability_status"], exposed_tools),
 		],
 	})
 
@@ -3047,6 +3320,249 @@ func _render_tool_error(code: String, error: String, data: Dictionary = {}) -> S
 		"error": error,
 		"data": data,
 	})
+
+
+func _build_script_refactor_plan(arguments: Dictionary) -> Dictionary:
+	var operation: String = str(arguments.get("operation", "rename_symbol")).strip_edges().to_lower()
+	if not (operation in ["rename_symbol", "replace_text"]):
+		return {"success": false, "error": "'operation' must be rename_symbol or replace_text."}
+
+	var find_text: String = ""
+	var replace_text: String = ""
+	if operation == "rename_symbol":
+		find_text = str(arguments.get("symbol", "")).strip_edges()
+		replace_text = str(arguments.get("new_name", "")).strip_edges()
+		if find_text == "" or replace_text == "":
+			return {"success": false, "error": "'symbol' and 'new_name' are required for rename_symbol."}
+		if not _is_simple_identifier(find_text) or not _is_simple_identifier(replace_text):
+			return {"success": false, "error": "rename_symbol expects simple identifier names."}
+	else:
+		find_text = str(arguments.get("find", ""))
+		replace_text = str(arguments.get("replace", ""))
+		if find_text == "":
+			return {"success": false, "error": "'find' is required for replace_text."}
+
+	var root_path: String = _normalize_path(str(arguments.get("path", "res://")))
+	if not root_path.begins_with("res://"):
+		return {"success": false, "error": "Script refactors are limited to res:// paths.", "path": root_path}
+	var language: String = _resolve_requested_script_language_set(str(arguments.get("language", "auto")))
+	var include_resources: bool = bool(arguments.get("include_resources", false))
+	var case_sensitive: bool = bool(arguments.get("case_sensitive", true))
+	var max_files: int = int(clamp(int(arguments.get("max_files", 300)), 1, 3000))
+	var max_matches_per_file: int = int(clamp(int(arguments.get("max_matches_per_file", 60)), 1, 500))
+	var extensions: Array = _script_refactor_extensions(language, include_resources)
+	var files: Array = []
+	if FileAccess.file_exists(root_path):
+		if _matches_extension(root_path, extensions):
+			files.append(root_path)
+	elif DirAccess.open(root_path) != null:
+		_collect_matching_files(root_path, true, max_files, files, extensions)
+	else:
+		return {"success": false, "error": "Path not found: %s" % root_path, "path": root_path}
+
+	files = _exclude_internal_plugin_paths(files)
+	files.sort()
+	var file_plans: Array = []
+	var total_matches: int = 0
+	var files_with_matches: int = 0
+	for file_path in files:
+		var file_plan: Dictionary = _scan_refactor_file(str(file_path), find_text, replace_text, case_sensitive, operation == "rename_symbol", max_matches_per_file)
+		if int(file_plan.get("match_count", 0)) <= 0:
+			continue
+		file_plans.append(file_plan)
+		total_matches += int(file_plan.get("match_count", 0))
+		files_with_matches += 1
+
+	return {
+		"success": true,
+		"dry_run": true,
+		"operation": operation,
+		"find_text": find_text,
+		"replace_text": replace_text,
+		"path": root_path,
+		"language": language,
+		"include_resources": include_resources,
+		"case_sensitive": case_sensitive,
+		"scanned_file_count": files.size(),
+		"affected_file_count": files_with_matches,
+		"total_matches": total_matches,
+		"files": file_plans,
+		"apply_instruction": "Review this plan, then call apply_script_refactor with the same arguments plus apply=true and confirm=true.",
+	}
+
+
+func _script_refactor_extensions(language: String, include_resources: bool) -> Array:
+	var extensions: Array = []
+	if language == "gdscript" or language == "mixed":
+		extensions.append(".gd")
+	if language == "dotnet" or language == "mixed":
+		extensions.append(".cs")
+	if extensions.is_empty():
+		extensions = [".gd", ".cs"]
+	if include_resources:
+		for extension in [".tscn", ".tres", ".gdshader", ".shader", ".cfg", ".json"]:
+			if not extensions.has(extension):
+				extensions.append(extension)
+	return extensions
+
+
+func _scan_refactor_file(path: String, find_text: String, replace_text: String, case_sensitive: bool, token_boundaries: bool, max_preview_matches: int) -> Dictionary:
+	var content: String = FileAccess.get_file_as_string(path)
+	var lines: PackedStringArray = content.split("\n")
+	var needle: String = find_text if case_sensitive else find_text.to_lower()
+	var matches: Array = []
+	var total_matches: int = 0
+	for line_index in range(lines.size()):
+		var line: String = lines[line_index]
+		var haystack: String = line if case_sensitive else line.to_lower()
+		var start_index: int = 0
+		while start_index < haystack.length():
+			var column_index: int = haystack.find(needle, start_index)
+			if column_index == -1:
+				break
+			if token_boundaries and not _has_token_boundaries(line, column_index, find_text.length()):
+				start_index = column_index + 1
+				continue
+			total_matches += 1
+			if matches.size() < max_preview_matches:
+				matches.append({
+					"line": line_index + 1,
+					"column": column_index + 1,
+					"snippet": line.strip_edges().substr(0, 240),
+					"replacement_preview": _replace_refactor_line(line, find_text, replace_text, case_sensitive, token_boundaries).strip_edges().substr(0, 240),
+				})
+			start_index = column_index + max(find_text.length(), 1)
+
+	return {
+		"path": path,
+		"match_count": total_matches,
+		"preview_truncated": total_matches > matches.size(),
+		"matches": matches,
+	}
+
+
+func _replace_refactor_text(content: String, find_text: String, replace_text: String, case_sensitive: bool, token_boundaries: bool) -> String:
+	var lines: PackedStringArray = content.split("\n")
+	for index in range(lines.size()):
+		lines[index] = _replace_refactor_line(lines[index], find_text, replace_text, case_sensitive, token_boundaries)
+	return "\n".join(lines)
+
+
+func _replace_refactor_line(line: String, find_text: String, replace_text: String, case_sensitive: bool, token_boundaries: bool) -> String:
+	var needle: String = find_text if case_sensitive else find_text.to_lower()
+	var haystack: String = line if case_sensitive else line.to_lower()
+	var result: String = ""
+	var cursor: int = 0
+	while cursor < line.length():
+		var column_index: int = haystack.find(needle, cursor)
+		if column_index == -1:
+			result += line.substr(cursor)
+			break
+		if token_boundaries and not _has_token_boundaries(line, column_index, find_text.length()):
+			result += line.substr(cursor, column_index - cursor + 1)
+			cursor = column_index + 1
+			continue
+		result += line.substr(cursor, column_index - cursor)
+		result += replace_text
+		cursor = column_index + max(find_text.length(), 1)
+	if cursor >= line.length():
+		return result
+	return result
+
+
+func _has_token_boundaries(line: String, column_index: int, token_length: int) -> bool:
+	var before_index: int = column_index - 1
+	if before_index >= 0 and _is_identifier_char(line.substr(before_index, 1)):
+		return false
+	var after_index: int = column_index + token_length
+	if after_index < line.length() and _is_identifier_char(line.substr(after_index, 1)):
+		return false
+	return true
+
+
+func _is_identifier_char(value: String) -> bool:
+	if value.length() == 0:
+		return false
+	var code: int = value.unicode_at(0)
+	return (code >= 48 and code <= 57) or (code >= 65 and code <= 90) or (code >= 97 and code <= 122) or code == 95
+
+
+func _is_simple_identifier(value: String) -> bool:
+	if value == "":
+		return false
+	if value.substr(0, 1).unicode_at(0) >= 48 and value.substr(0, 1).unicode_at(0) <= 57:
+		return false
+	for index in range(value.length()):
+		if not _is_identifier_char(value.substr(index, 1)):
+			return false
+	return true
+
+
+func _slug_name(value: String, fallback: String) -> String:
+	var normalized: String = value.strip_edges().to_lower()
+	var result: String = ""
+	var previous_dash: bool = false
+	for index in range(normalized.length()):
+		var ch: String = normalized.substr(index, 1)
+		if _is_identifier_char(ch):
+			result += ch
+			previous_dash = false
+		elif not previous_dash:
+			result += "-"
+			previous_dash = true
+	result = result.strip_edges().trim_prefix("-").trim_suffix("-")
+	if result == "":
+		return fallback
+	return result
+
+
+func _read_text_if_exists(path: String) -> String:
+	if not FileAccess.file_exists(path):
+		return ""
+	return FileAccess.get_file_as_string(path)
+
+
+func _read_json_file(path: String) -> Dictionary:
+	var text: String = _read_text_if_exists(path)
+	if text == "":
+		return {}
+	var parsed = JSON.parse_string(text)
+	if parsed is Dictionary:
+		return parsed
+	return {}
+
+
+func _read_plugin_version() -> String:
+	return _extract_quoted_value_after(_read_text_if_exists("res://addons/funplay_mcp/plugin.cfg"), "version=")
+
+
+func _read_server_version() -> String:
+	return _extract_quoted_value_after(_read_text_if_exists("res://addons/funplay_mcp/core/funplay_mcp_server.gd"), "SERVER_VERSION")
+
+
+func _extract_quoted_value_after(text: String, marker: String) -> String:
+	var marker_index: int = text.find(marker)
+	if marker_index == -1:
+		return ""
+	var quote_start: int = text.find("\"", marker_index)
+	if quote_start == -1:
+		return ""
+	var quote_end: int = text.find("\"", quote_start + 1)
+	if quote_end == -1:
+		return ""
+	return text.substr(quote_start + 1, quote_end - quote_start - 1)
+
+
+func _add_readiness_check(checks: Array, name: String, passed: bool, message: String) -> void:
+	checks.append({
+		"name": name,
+		"status": "pass" if passed else "fail",
+		"message": message,
+	})
+
+
+func _readme_mentions_tool_count(text: String, tool_count: int) -> bool:
+	return text.find("**%s Built-in Tools" % str(tool_count)) != -1 or text.find("**%s registered tools" % str(tool_count)) != -1 or text.find("**%s 个内置工具" % str(tool_count)) != -1 or text.find("**%s 个注册工具函数" % str(tool_count)) != -1
 
 
 func _build_execute_code_context(execution_context: ExecutionContext) -> Dictionary:

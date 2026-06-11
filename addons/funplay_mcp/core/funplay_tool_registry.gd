@@ -214,6 +214,41 @@ func _register_tools() -> void:
 		},
 		"required": ["symbol"],
 	}, "find_usages", ["core", "full"])
+	_register_tool("plan_script_refactor", "Preview a safe text-based script refactor across project scripts before applying it.", {
+		"type": "object",
+		"properties": {
+			"operation": {"type": "string", "enum": ["rename_symbol", "replace_text"], "default": "rename_symbol"},
+			"symbol": {"type": "string"},
+			"new_name": {"type": "string"},
+			"find": {"type": "string"},
+			"replace": {"type": "string"},
+			"path": {"type": "string", "default": "res://"},
+			"language": {"type": "string", "enum": ["auto", "gdscript", "dotnet", "mixed"], "default": "auto"},
+			"include_resources": {"type": "boolean", "default": false},
+			"case_sensitive": {"type": "boolean", "default": true},
+			"max_files": {"type": "integer", "default": 300},
+			"max_matches_per_file": {"type": "integer", "default": 60},
+		},
+	}, "plan_script_refactor", ["core", "full"])
+	_register_tool("apply_script_refactor", "Apply a previously reviewed script refactor with explicit apply and confirm flags.", {
+		"type": "object",
+		"properties": {
+			"operation": {"type": "string", "enum": ["rename_symbol", "replace_text"], "default": "rename_symbol"},
+			"symbol": {"type": "string"},
+			"new_name": {"type": "string"},
+			"find": {"type": "string"},
+			"replace": {"type": "string"},
+			"path": {"type": "string", "default": "res://"},
+			"language": {"type": "string", "enum": ["auto", "gdscript", "dotnet", "mixed"], "default": "auto"},
+			"include_resources": {"type": "boolean", "default": false},
+			"case_sensitive": {"type": "boolean", "default": true},
+			"max_files": {"type": "integer", "default": 300},
+			"max_matches_per_file": {"type": "integer", "default": 60},
+			"apply": {"type": "boolean", "default": false},
+			"confirm": {"type": "boolean", "default": false},
+			"create_backup": {"type": "boolean", "default": false},
+		},
+	}, "apply_script_refactor", ["full"])
 	_register_tool("list_scenes", "List scene files in the project and report currently open scenes.", {
 		"type": "object",
 		"properties": {
@@ -452,11 +487,18 @@ func _register_tools() -> void:
 	_register_tool("funplay_help", "Return workflow help for common Funplay MCP tasks and tool-selection guidance.", {
 		"type": "object",
 		"properties": {
-			"topic": {"type": "string", "enum": ["overview", "scene", "runtime", "scripts", "ui"], "default": "overview"},
+			"topic": {"type": "string", "enum": ["overview", "scene", "runtime", "scripts", "refactor", "ui", "assets", "release"], "default": "overview"},
 		},
 	}, "funplay_help", ["core", "full"])
 	_register_tool("get_capability_status", "Return detected project, editor, protocol, undo/redo, and runtime bridge capability gates.", _empty_schema(), "get_capability_status", ["core", "full"])
 	_register_tool("get_editor_protocol_status", "Return Godot editor LSP and debug-adapter settings discovered from EditorSettings.", _empty_schema(), "get_editor_protocol_status", ["core", "full"])
+	_register_tool("get_release_readiness", "Return release, npm wrapper, MCP Registry, Asset Library, and validation readiness checks.", {
+		"type": "object",
+		"properties": {
+			"version": {"type": "string"},
+			"include_commands": {"type": "boolean", "default": true},
+		},
+	}, "get_release_readiness", ["core", "full"])
 	_register_tool("get_undo_redo_status", "Return availability of the Godot EditorUndoRedoManager bridge.", _empty_schema(), "get_undo_redo_status", ["core", "full"])
 	_register_tool("editor_undo", "Run one editor undo step through EditorUndoRedoManager when available.", _empty_schema(), "editor_undo", ["core", "full"])
 	_register_tool("editor_redo", "Run one editor redo step through EditorUndoRedoManager when available.", _empty_schema(), "editor_redo", ["core", "full"])
@@ -486,6 +528,20 @@ func _register_tools() -> void:
 		},
 	}, "generate_project_skills", ["core", "full"])
 	_register_tool("list_project_features", "Return project settings such as main scene, input actions, and autoloads.", _empty_schema(), "list_project_features", ["core", "full"])
+	_register_tool("plan_asset_import", "Create a safe optional asset import plan and optional manifest under res://assets/imported/.", {
+		"type": "object",
+		"properties": {
+			"source": {"type": "string", "default": "external"},
+			"package_name": {"type": "string", "default": "asset_pack"},
+			"license": {"type": "string", "default": "CC0-1.0"},
+			"target_root": {"type": "string", "default": "res://assets/imported"},
+			"assets": {"type": "array"},
+			"notes": {"type": "string"},
+			"create_directories": {"type": "boolean", "default": false},
+			"write_manifest": {"type": "boolean", "default": false},
+			"overwrite_manifest": {"type": "boolean", "default": false},
+		},
+	}, "plan_asset_import", ["core", "full"])
 	_register_tool("list_project_settings", "List ProjectSettings entries, optionally filtered by prefix.", {
 		"type": "object",
 		"properties": {
@@ -1126,13 +1182,13 @@ func _tool_hidden_reason(language_allowed: bool, disabled: bool) -> String:
 func _infer_tool_group(tool_name: String) -> String:
 	if tool_name in ["execute_code", "capture_editor_view", "log_message", "wait_msec"]:
 		return "execution"
-	if tool_name in ["funplay_help", "list_tool_catalog", "get_capability_status", "list_workflow_coverage"]:
+	if tool_name in ["funplay_help", "list_tool_catalog", "get_capability_status", "get_release_readiness", "list_workflow_coverage"]:
 		return "guidance"
-	if tool_name in ["map_project", "find_usages"]:
+	if tool_name in ["map_project", "find_usages", "plan_script_refactor", "apply_script_refactor"]:
 		return "project_map"
 	if tool_name in ["get_editor_protocol_status", "get_script_errors", "validate_script", "request_script_reload", "get_console_logs", "get_performance_snapshot", "analyze_scene_complexity"]:
 		return "diagnostics"
-	if tool_name in ["get_project_info", "list_project_features", "list_project_settings", "get_project_setting", "set_project_setting", "get_project_skills_status", "generate_project_skills"]:
+	if tool_name in ["get_project_info", "list_project_features", "plan_asset_import", "list_project_settings", "get_project_setting", "set_project_setting", "get_project_skills_status", "generate_project_skills"]:
 		return "project"
 	if tool_name in ["list_input_actions", "get_input_action", "add_input_action", "remove_input_action", "add_input_event_to_action", "clear_input_events"]:
 		return "input"

@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.10.0] - 2026-06-11
+
+### Added
+- Added `plan_script_refactor` for dry-run script rename/replace previews with per-file match snippets
+- Added `apply_script_refactor` for confirmed batch refactors with optional backup files
+- Added `plan_asset_import` for safe CC0/permissive asset import paths and optional license manifest creation
+- Added `get_release_readiness` and `godot://release/readiness` for version, npm wrapper, MCP Registry, Asset Library, and validation checks
+
+### Changed
+- Expanded workflow coverage toward P2/P3 productization, refactor planning, asset pipeline, and release readiness workflows
+
 ## [0.9.0] - 2026-06-10
 
 ### Added

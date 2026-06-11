@@ -107,6 +107,12 @@ func list_resources() -> Array:
 			"mimeType": "application/json",
 		},
 		{
+			"uri": "godot://release/readiness",
+			"name": "Release Readiness",
+			"description": "Version, npm wrapper, MCP Registry, Asset Library, and validation readiness checks.",
+			"mimeType": "application/json",
+		},
+		{
 			"uri": "godot://logs/recent",
 			"name": "Recent Logs",
 			"description": "Recent lines from Godot's project log files.",
@@ -222,6 +228,8 @@ func read_resource(uri: String) -> Dictionary:
 		return _content_response(uri, _runtime_scene_tree(), "application/json")
 	if uri == "godot://workflow/coverage":
 		return _content_response(uri, _core_tools.list_workflow_coverage({}), "application/json")
+	if uri == "godot://release/readiness":
+		return _content_response(uri, _core_tools.get_release_readiness({}), "application/json")
 	if uri == "godot://logs/recent":
 		return _content_response(uri, _core_tools.get_console_logs({}), "application/json")
 	if uri == "godot://scripts/errors":
