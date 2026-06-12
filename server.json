@@ -7,12 +7,12 @@
     "url": "https://github.com/FunplayAI/funplay-godot-mcp",
     "source": "github"
   },
-  "version": "0.9.0",
+  "version": "0.9.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "funplay-godot-mcp",
-      "version": "0.9.0",
+      "version": "0.9.1",
       "transport": {
         "type": "stdio"
       },
@@ -30,6 +30,20 @@
           "isRequired": false,
           "format": "string",
           "isSecret": false
+        },
+        {
+          "name": "FUNPLAY_GODOT_MCP_TOKEN",
+          "description": "Godot MCP local auth token from the Funplay MCP dock or user://funplay_mcp_settings.cfg.",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "GODOT_MCP_TOKEN",
+          "description": "Compatibility token variable used when FUNPLAY_GODOT_MCP_TOKEN is not set.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
         }
       ]
     }

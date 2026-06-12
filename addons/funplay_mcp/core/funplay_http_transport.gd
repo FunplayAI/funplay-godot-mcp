@@ -183,6 +183,10 @@ func _send_response(peer: StreamPeerTCP, response: Dictionary) -> void:
 			status_text = "No Content"
 		400:
 			status_text = "Bad Request"
+		401:
+			status_text = "Unauthorized"
+		403:
+			status_text = "Forbidden"
 		404:
 			status_text = "Not Found"
 		405:

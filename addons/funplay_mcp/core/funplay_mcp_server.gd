@@ -5,7 +5,7 @@ const FunplayHttpTransport = preload("res://addons/funplay_mcp/core/funplay_http
 const FunplayMcpRequestHandler = preload("res://addons/funplay_mcp/core/funplay_mcp_request_handler.gd")
 
 const SERVER_NAME = "Funplay MCP Server - Godot"
-const SERVER_VERSION = "0.9.0"
+const SERVER_VERSION = "0.9.1"
 const DEFAULT_PORT = 8765
 const MAX_LOG_ENTRIES = 50
 
@@ -145,6 +145,7 @@ func _handle_http_request(method: String, path: String, body_text: String, heade
 					"tool_profile": _settings.tool_profile,
 					"debug_logging_enabled": _settings.debug_logging_enabled,
 					"execute_code_safety_checks_enabled": _settings.execute_code_safety_checks_enabled,
+					"auth_required": str(_settings.server_auth_token).strip_edges() != "",
 					"protocol_version": _request_handler.get_default_protocol_version(),
 					"project_name": str(ProjectSettings.get_setting("application/config/name", "")),
 					"project_identity": _project_identity_hash(),
@@ -163,6 +164,10 @@ func _handle_http_request(method: String, path: String, body_text: String, heade
 			"content_type": "text/plain",
 			"body": "Method Not Allowed",
 		}
+
+	var security_response: Dictionary = _validate_post_request_security(headers)
+	if not security_response.is_empty():
+		return security_response
 
 	var protocol_version: String = str(headers.get("mcp-protocol-version", "")).strip_edges()
 	if protocol_version != "" and not _request_handler.is_protocol_version_supported(protocol_version):
@@ -283,3 +288,79 @@ func _is_matching_project_server(probe: Dictionary) -> bool:
 func _project_identity_hash() -> String:
 	var root: String = ProjectSettings.globalize_path("res://")
 	return root.sha256_text().substr(0, 16)
+
+
+func _validate_post_request_security(headers: Dictionary) -> Dictionary:
+	var origin: String = str(headers.get("origin", "")).strip_edges()
+	if origin != "" and not _is_allowed_local_request_origin(origin):
+		return _json_error_response(403, -32001, "Forbidden request origin.")
+
+	var referer: String = str(headers.get("referer", "")).strip_edges()
+	if referer != "" and not _is_allowed_local_request_origin(referer):
+		return _json_error_response(403, -32001, "Forbidden request referer.")
+
+	var expected_token: String = str(_settings.server_auth_token).strip_edges()
+	if expected_token == "":
+		return {}
+
+	var provided_token: String = _extract_request_auth_token(headers)
+	if provided_token == "" or provided_token != expected_token:
+		return _json_error_response(401, -32001, "Missing or invalid Funplay MCP auth token.")
+
+	return {}
+
+
+func _extract_request_auth_token(headers: Dictionary) -> String:
+	var token: String = str(headers.get("x-funplay-mcp-token", "")).strip_edges()
+	if token != "":
+		return token
+
+	var authorization: String = str(headers.get("authorization", "")).strip_edges()
+	if authorization.to_lower().begins_with("bearer "):
+		return authorization.substr(7).strip_edges()
+	return ""
+
+
+func _is_allowed_local_request_origin(value: String) -> bool:
+	var host: String = _extract_request_host(value)
+	return host in ["127.0.0.1", "localhost", "::1"]
+
+
+func _extract_request_host(value: String) -> String:
+	var text: String = value.strip_edges()
+	var scheme_index: int = text.find("://")
+	if scheme_index != -1:
+		text = text.substr(scheme_index + 3)
+
+	var slash_index: int = text.find("/")
+	if slash_index != -1:
+		text = text.substr(0, slash_index)
+
+	if text.contains("@"):
+		var userinfo_parts: PackedStringArray = text.split("@", false)
+		text = str(userinfo_parts[userinfo_parts.size() - 1])
+
+	if text.begins_with("["):
+		var close_index: int = text.find("]")
+		if close_index != -1:
+			return text.substr(1, close_index - 1).to_lower()
+
+	var colon_index: int = text.find(":")
+	if colon_index != -1:
+		text = text.substr(0, colon_index)
+	return text.to_lower()
+
+
+func _json_error_response(status: int, code: int, message: String) -> Dictionary:
+	return {
+		"status": status,
+		"content_type": "application/json",
+		"body": JSON.stringify({
+			"jsonrpc": "2.0",
+			"id": null,
+			"error": {
+				"code": code,
+				"message": message,
+			},
+		}),
+	}

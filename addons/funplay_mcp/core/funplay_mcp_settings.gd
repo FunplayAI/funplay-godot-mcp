@@ -7,6 +7,7 @@ const SETTINGS_PATH = "user://funplay_mcp_settings.cfg"
 
 var server_enabled: bool = true
 var server_port: int = 8765
+var server_auth_token: String = ""
 var tool_profile: String = "core"
 var debug_logging_enabled: bool = false
 var execute_code_safety_checks_enabled: bool = true
@@ -15,6 +16,9 @@ var disabled_tools: Array[String] = []
 
 func _init() -> void:
 	load_settings()
+	if server_auth_token == "":
+		server_auth_token = _generate_auth_token()
+		save_settings()
 
 
 func load_settings() -> void:
@@ -25,6 +29,7 @@ func load_settings() -> void:
 
 	server_enabled = bool(config.get_value("server", "enabled", true))
 	server_port = int(config.get_value("server", "port", 8765))
+	server_auth_token = str(config.get_value("server", "auth_token", ""))
 	tool_profile = str(config.get_value("server", "tool_profile", "core"))
 	debug_logging_enabled = bool(config.get_value("server", "debug_logging_enabled", false))
 	execute_code_safety_checks_enabled = bool(config.get_value("server", "execute_code_safety_checks_enabled", true))
@@ -35,6 +40,7 @@ func save_settings() -> void:
 	var config = ConfigFile.new()
 	config.set_value("server", "enabled", server_enabled)
 	config.set_value("server", "port", server_port)
+	config.set_value("server", "auth_token", server_auth_token)
 	config.set_value("server", "tool_profile", tool_profile)
 	config.set_value("server", "debug_logging_enabled", debug_logging_enabled)
 	config.set_value("server", "execute_code_safety_checks_enabled", execute_code_safety_checks_enabled)
@@ -55,6 +61,12 @@ func update_server_port(value: int) -> void:
 	if server_port == normalized:
 		return
 	server_port = normalized
+	save_settings()
+	settings_changed.emit()
+
+
+func rotate_server_auth_token() -> void:
+	server_auth_token = _generate_auth_token()
 	save_settings()
 	settings_changed.emit()
 
@@ -127,3 +139,16 @@ func _normalize_string_array(value) -> Array[String]:
 				results.append(text)
 	results.sort()
 	return results
+
+
+func _generate_auth_token() -> String:
+	var rng = RandomNumberGenerator.new()
+	rng.randomize()
+	var seed = "%s:%s:%s:%s:%s" % [
+		ProjectSettings.globalize_path("res://"),
+		Time.get_datetime_string_from_system(true, true),
+		str(Time.get_ticks_usec()),
+		str(rng.randi()),
+		str(rng.randi()),
+	]
+	return seed.sha256_text()

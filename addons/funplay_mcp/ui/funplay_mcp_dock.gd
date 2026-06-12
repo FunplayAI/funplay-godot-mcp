@@ -406,7 +406,7 @@ func _build_log_text() -> String:
 
 
 func _get_selected_target() -> Dictionary:
-	var targets: Array = _client_config_writer.list_targets(_get_endpoint())
+	var targets: Array = _client_config_writer.list_targets(_get_endpoint(), _settings.server_auth_token)
 	var selected_name: String = _client_button.get_item_text(_client_button.selected)
 	for target in targets:
 		if str(target.get("name", "")) == selected_name:

@@ -15,13 +15,13 @@ npm link
 Then run:
 
 ```bash
-funplay-godot-mcp --url http://127.0.0.1:8765/
+funplay-godot-mcp --url http://127.0.0.1:8765/ --token <token>
 ```
 
-You can also configure the endpoint through an environment variable:
+You can also configure the endpoint and local auth token through environment variables:
 
 ```bash
-FUNPLAY_GODOT_MCP_URL=http://127.0.0.1:8765/ funplay-godot-mcp
+FUNPLAY_GODOT_MCP_URL=http://127.0.0.1:8765/ FUNPLAY_GODOT_MCP_TOKEN=<token> funplay-godot-mcp
 ```
 
 ## MCP client config
@@ -32,7 +32,8 @@ FUNPLAY_GODOT_MCP_URL=http://127.0.0.1:8765/ funplay-godot-mcp
     "funplay": {
       "command": "funplay-godot-mcp",
       "env": {
-        "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/"
+        "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/",
+        "FUNPLAY_GODOT_MCP_TOKEN": "<token from Funplay MCP dock>"
       }
     }
   }

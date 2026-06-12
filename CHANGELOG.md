@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.9.1] - 2026-06-12
+
+### Fixed
+- Fixed Godot 4.6 plugin load failures caused by reserved `class_name` local variables in project map script summarization
+- Restricted project file tools and project file resources to normalized `res://` paths that cannot escape the project root through parent-directory traversal
+
+### Security
+- Added default local MCP auth tokens, stdio wrapper token forwarding, and one-click client configs that write token-aware stdio entries
+- Rejected browser-style MCP POST requests with non-local `Origin` or `Referer` headers while keeping health checks available
+
 ## [0.9.0] - 2026-06-11
 
 ### Added

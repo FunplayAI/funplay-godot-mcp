@@ -627,12 +627,14 @@ func save_scene_as(arguments: Dictionary) -> String:
 
 
 func list_files(arguments: Dictionary) -> String:
-	var root_path = _normalize_path(str(arguments.get("path", "res://")))
+	var root_path = _normalize_project_path(str(arguments.get("path", "res://")))
 	var recursive = bool(arguments.get("recursive", true))
 	var include_hidden = bool(arguments.get("include_hidden", false))
 	var max_entries = clamp(int(arguments.get("max_entries", 200)), 1, 4000)
 	var results: Array = []
 
+	if root_path == "":
+		return _project_path_error("path")
 	if DirAccess.open(root_path) == null:
 		return "Error: Directory not found: %s" % root_path
 
@@ -645,8 +647,10 @@ func list_files(arguments: Dictionary) -> String:
 
 
 func search_files(arguments: Dictionary) -> String:
-	var root_path = _normalize_path(str(arguments.get("path", "res://")))
+	var root_path = _normalize_project_path(str(arguments.get("path", "res://")))
 	var pattern = str(arguments.get("pattern", "")).strip_edges()
+	if root_path == "":
+		return _project_path_error("path")
 	if pattern == "":
 		return "Error: 'pattern' is required."
 
@@ -666,9 +670,9 @@ func search_files(arguments: Dictionary) -> String:
 
 
 func file_exists(arguments: Dictionary) -> String:
-	var path = _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_project_path(str(arguments.get("path", "")))
 	if path == "":
-		return "Error: 'path' is required."
+		return _project_path_error("path")
 
 	var exists = FileAccess.file_exists(path) or DirAccess.dir_exists_absolute(path) or ResourceLoader.exists(path)
 	return _render_variant({
@@ -678,9 +682,9 @@ func file_exists(arguments: Dictionary) -> String:
 
 
 func read_file(arguments: Dictionary) -> String:
-	var path = _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_project_path(str(arguments.get("path", "")))
 	if path == "":
-		return "Error: 'path' is required."
+		return _project_path_error("path")
 	if not FileAccess.file_exists(path):
 		return "Error: File not found: %s" % path
 
@@ -700,9 +704,9 @@ func read_file(arguments: Dictionary) -> String:
 
 
 func write_file(arguments: Dictionary) -> String:
-	var path = _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_project_path(str(arguments.get("path", "")))
 	if path == "":
-		return "Error: 'path' is required."
+		return _project_path_error("path")
 
 	var ensure_err = _ensure_parent_dir(path)
 	if ensure_err != OK:
@@ -722,9 +726,9 @@ func write_file(arguments: Dictionary) -> String:
 
 
 func delete_file(arguments: Dictionary) -> String:
-	var path = _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_project_path(str(arguments.get("path", "")))
 	if path == "":
-		return "Error: 'path' is required."
+		return _project_path_error("path")
 
 	var err = DirAccess.remove_absolute(path)
 	if err != OK:
@@ -735,10 +739,10 @@ func delete_file(arguments: Dictionary) -> String:
 
 
 func move_file(arguments: Dictionary) -> String:
-	var from_path = _normalize_path(str(arguments.get("from_path", "")))
-	var to_path = _normalize_path(str(arguments.get("to_path", "")))
+	var from_path = _normalize_project_path(str(arguments.get("from_path", "")))
+	var to_path = _normalize_project_path(str(arguments.get("to_path", "")))
 	if from_path == "" or to_path == "":
-		return "Error: 'from_path' and 'to_path' are required."
+		return _project_path_error("from_path/to_path")
 
 	var ensure_err = _ensure_parent_dir(to_path)
 	if ensure_err != OK:
@@ -753,10 +757,10 @@ func move_file(arguments: Dictionary) -> String:
 
 
 func copy_file(arguments: Dictionary) -> String:
-	var from_path = _normalize_path(str(arguments.get("from_path", "")))
-	var to_path = _normalize_path(str(arguments.get("to_path", "")))
+	var from_path = _normalize_project_path(str(arguments.get("from_path", "")))
+	var to_path = _normalize_project_path(str(arguments.get("to_path", "")))
 	if from_path == "" or to_path == "":
-		return "Error: 'from_path' and 'to_path' are required."
+		return _project_path_error("from_path/to_path")
 
 	var ensure_err = _ensure_parent_dir(to_path)
 	if ensure_err != OK:
@@ -816,7 +820,9 @@ func create_script(arguments: Dictionary) -> String:
 
 
 func list_scripts(arguments: Dictionary) -> String:
-	var root_path = _normalize_path(str(arguments.get("path", "res://")))
+	var root_path = _normalize_project_path(str(arguments.get("path", "res://")))
+	if root_path == "":
+		return _project_path_error("path")
 	var max_entries = clamp(int(arguments.get("max_entries", 300)), 1, 5000)
 	var recursive = bool(arguments.get("recursive", true))
 	var requested_language = str(arguments.get("language", "auto")).to_lower()
@@ -846,9 +852,9 @@ func list_scripts(arguments: Dictionary) -> String:
 
 
 func create_csharp_script(arguments: Dictionary) -> String:
-	var path = _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_project_path(str(arguments.get("path", "")))
 	if path == "":
-		return "Error: 'path' is required."
+		return _project_path_error("path")
 	if not path.to_lower().ends_with(".cs"):
 		return "Error: C# script path must end with .cs"
 
@@ -900,7 +906,9 @@ func create_csharp_script(arguments: Dictionary) -> String:
 
 
 func list_csharp_scripts(arguments: Dictionary) -> String:
-	var root_path = _normalize_path(str(arguments.get("path", "res://")))
+	var root_path = _normalize_project_path(str(arguments.get("path", "res://")))
+	if root_path == "":
+		return _project_path_error("path")
 	var max_entries = clamp(int(arguments.get("max_entries", 300)), 1, 5000)
 	var recursive = bool(arguments.get("recursive", true))
 	var script_paths: Array = []
@@ -938,9 +946,9 @@ func edit_script(arguments: Dictionary) -> String:
 
 
 func patch_script(arguments: Dictionary) -> String:
-	var path = _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_project_path(str(arguments.get("path", "")))
 	if path == "":
-		return "Error: 'path' is required."
+		return _project_path_error("path")
 	if not FileAccess.file_exists(path):
 		return "Error: File not found: %s" % path
 
@@ -970,9 +978,9 @@ func patch_script(arguments: Dictionary) -> String:
 
 
 func open_script(arguments: Dictionary) -> String:
-	var path = _normalize_path(str(arguments.get("path", "")))
+	var path = _normalize_project_path(str(arguments.get("path", "")))
 	if path == "":
-		return "Error: 'path' is required."
+		return _project_path_error("path")
 
 	var script = load(path)
 	if script == null or not (script is Script):
@@ -3979,7 +3987,7 @@ func _summarize_script_file(path: String, max_members: int) -> Dictionary:
 	var signals: Array = []
 	var exports: Array = []
 	var dependencies: Array = []
-	var class_name: String = ""
+	var script_class_label: String = ""
 	var extends_name: String = ""
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if file == null:
@@ -3997,13 +4005,13 @@ func _summarize_script_file(path: String, max_members: int) -> Dictionary:
 			continue
 
 		if trimmed.begins_with("class_name "):
-			class_name = trimmed.trim_prefix("class_name ").strip_edges()
+			script_class_label = trimmed.trim_prefix("class_name ").strip_edges()
 		elif trimmed.begins_with("extends "):
 			extends_name = trimmed.trim_prefix("extends ").strip_edges()
 		elif language == "dotnet" and trimmed.contains(" class "):
 			var csharp_class: Dictionary = _extract_csharp_class(trimmed)
 			if csharp_class.get("class_name", "") != "":
-				class_name = str(csharp_class.get("class_name", ""))
+				script_class_label = str(csharp_class.get("class_name", ""))
 			if csharp_class.get("extends", "") != "":
 				extends_name = str(csharp_class.get("extends", ""))
 
@@ -4035,7 +4043,7 @@ func _summarize_script_file(path: String, max_members: int) -> Dictionary:
 		"path": path,
 		"language": language,
 		"line_count": lines.size(),
-		"class_name": class_name,
+		"class_name": script_class_label,
 		"extends": extends_name,
 		"signals": signals,
 		"functions": functions,
@@ -4224,14 +4232,14 @@ func _extract_csharp_class(line: String) -> Dictionary:
 	if class_index == -1:
 		return {}
 	var after_class: String = line.substr(class_index + 7).strip_edges()
-	var class_name: String = _first_token_before(after_class, [" ", ":", "{"])
+	var parsed_class_name: String = _first_token_before(after_class, [" ", ":", "{"])
 	var extends_name: String = ""
 	var colon_index: int = line.find(":")
 	if colon_index != -1:
 		var after_colon: String = line.substr(colon_index + 1).strip_edges()
 		extends_name = _first_token_before(after_colon, [",", "{", " "])
 	return {
-		"class_name": class_name,
+		"class_name": parsed_class_name,
 		"extends": extends_name,
 	}
 
@@ -4347,16 +4355,52 @@ func _resolve_animation_player(node_path: String):
 
 
 func _normalize_path(path: String) -> String:
-	var trimmed = path.strip_edges()
+	var trimmed = path.strip_edges().replace("\\", "/")
 	if trimmed == "":
 		return ""
 	if trimmed.begins_with("res://") or trimmed.begins_with("user://"):
+		if _virtual_path_escapes_root(trimmed):
+			return ""
 		return trimmed.simplify_path()
-	return ("res://" + trimmed.trim_prefix("/")).simplify_path()
+
+	var virtual_path: String = "res://" + trimmed.trim_prefix("/")
+	if _virtual_path_escapes_root(virtual_path):
+		return ""
+	return virtual_path.simplify_path()
+
+
+func _normalize_project_path(path: String) -> String:
+	var normalized: String = _normalize_path(path)
+	if normalized == "" or not normalized.begins_with("res://"):
+		return ""
+	return normalized
+
+
+func _virtual_path_escapes_root(path: String) -> bool:
+	var root_index: int = path.find("://")
+	if root_index == -1:
+		return true
+	var relative_path: String = path.substr(root_index + 3)
+	var depth: int = 0
+	for part in relative_path.split("/", false):
+		var segment: String = str(part).strip_edges()
+		if segment == "" or segment == ".":
+			continue
+		if segment == "..":
+			depth -= 1
+			if depth < 0:
+				return true
+		else:
+			depth += 1
+	return false
+
+
+func _project_path_error(field_name: String) -> String:
+	return "Error: '%s' must stay under res:// and must not contain parent-directory traversal." % field_name
 
 
 func _normalize_script_path(path: String, language: String) -> String:
-	var normalized = _normalize_path(path)
+	var normalized = _normalize_project_path(path)
 	if normalized == "":
 		return ""
 	if normalized.to_lower().ends_with(".gd") or normalized.to_lower().ends_with(".cs"):

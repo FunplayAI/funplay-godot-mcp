@@ -286,11 +286,12 @@ func _get_interaction_log() -> Array:
 
 
 func _read_project_file(relative_path: String) -> String:
-	var path: String = relative_path
+	var path: String = relative_path.strip_edges().replace("\\", "/")
 	if not path.begins_with("res://"):
-		path = ("res://" + path.trim_prefix("/")).simplify_path()
-	else:
-		path = path.simplify_path()
+		path = "res://" + path.trim_prefix("/")
+	if _virtual_path_escapes_root(path):
+		return "Error: Path must stay under res:// and must not contain parent-directory traversal."
+	path = path.simplify_path()
 
 	if not FileAccess.file_exists(path):
 		return "Error: File not found: %s" % path
@@ -300,6 +301,25 @@ func _read_project_file(relative_path: String) -> String:
 		return "Error: Failed to open file: %s" % path
 
 	return file.get_as_text()
+
+
+func _virtual_path_escapes_root(path: String) -> bool:
+	var root_index: int = path.find("://")
+	if root_index == -1:
+		return true
+	var relative_path: String = path.substr(root_index + 3)
+	var depth: int = 0
+	for part in relative_path.split("/", false):
+		var segment: String = str(part).strip_edges()
+		if segment == "" or segment == ".":
+			continue
+		if segment == "..":
+			depth -= 1
+			if depth < 0:
+				return true
+		else:
+			depth += 1
+	return false
 
 
 func _runtime_scene_tree() -> String:

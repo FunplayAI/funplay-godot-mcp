@@ -2,7 +2,7 @@
 
 import { argv, env, exit, stderr, stdin, stdout } from "node:process";
 
-const VERSION = "0.9.0";
+const VERSION = "0.9.1";
 const DEFAULT_URL = "http://127.0.0.1:8765/";
 
 const options = parseArgs(argv.slice(2));
@@ -18,6 +18,9 @@ if (options.version) {
 const endpoint = normalizeEndpoint(
   options.url || env.FUNPLAY_GODOT_MCP_URL || env.GODOT_MCP_URL || DEFAULT_URL,
 );
+const authToken = String(
+  options.token || env.FUNPLAY_GODOT_MCP_TOKEN || env.GODOT_MCP_TOKEN || "",
+).trim();
 
 let buffer = "";
 let queue = Promise.resolve();
@@ -104,12 +107,17 @@ async function handleLine(line) {
 
 async function forwardMessage(message) {
   try {
+    const headers = {
+      "accept": "application/json",
+      "content-type": "application/json",
+    };
+    if (authToken !== "") {
+      headers["x-funplay-mcp-token"] = authToken;
+    }
+
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: {
-        "accept": "application/json",
-        "content-type": "application/json",
-      },
+      headers,
       body: JSON.stringify(message),
     });
 
@@ -173,6 +181,7 @@ function parseArgs(args) {
     help: false,
     version: false,
     url: "",
+    token: "",
   };
 
   for (let i = 0; i < args.length; i += 1) {
@@ -186,6 +195,11 @@ function parseArgs(args) {
       i += 1;
     } else if (arg.startsWith("--url=")) {
       parsed.url = arg.slice("--url=".length);
+    } else if (arg === "--token") {
+      parsed.token = args[i + 1] || "";
+      i += 1;
+    } else if (arg.startsWith("--token=")) {
+      parsed.token = arg.slice("--token=".length);
     } else {
       stderr.write(`[funplay-godot-mcp] Unknown argument ignored: ${arg}\n`);
     }
@@ -198,11 +212,13 @@ function buildHelp() {
   return `Funplay MCP for Godot stdio bridge ${VERSION}
 
 Usage:
-  funplay-godot-mcp [--url http://127.0.0.1:8765/]
+  funplay-godot-mcp [--url http://127.0.0.1:8765/] [--token TOKEN]
 
 Environment:
   FUNPLAY_GODOT_MCP_URL   Godot MCP HTTP endpoint
   GODOT_MCP_URL           Compatibility endpoint fallback
+  FUNPLAY_GODOT_MCP_TOKEN Godot MCP local auth token
+  GODOT_MCP_TOKEN         Compatibility token fallback
 
 The Godot editor addon must be enabled and its MCP server must be running.
 `;

@@ -59,6 +59,7 @@ In Godot:
 
 The server starts on `http://127.0.0.1:8765/` by default.
 If that port is already occupied, it automatically picks another free local port and saves it to `user://funplay_mcp_settings.cfg`.
+Local MCP POST requests require the per-project auth token stored in `user://funplay_mcp_settings.cfg`; the dock writes it into generated stdio client configs automatically.
 The dock also shows the installed addon version and includes a **Check Updates** action that opens the latest GitHub Release when a newer version is available.
 
 ### 3. Configure Your AI Client
@@ -78,8 +79,13 @@ If you prefer to edit config files manually, use the examples below as fallback 
 {
   "mcpServers": {
     "funplay": {
-      "type": "http",
-      "url": "http://127.0.0.1:8765/"
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "funplay-godot-mcp@0.9.1"],
+      "env": {
+        "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/",
+        "FUNPLAY_GODOT_MCP_TOKEN": "<token from Funplay MCP dock>"
+      }
     }
   }
 }
@@ -94,7 +100,12 @@ If you prefer to edit config files manually, use the examples below as fallback 
 {
   "mcpServers": {
     "funplay": {
-      "url": "http://127.0.0.1:8765/"
+      "command": "npx",
+      "args": ["-y", "funplay-godot-mcp@0.9.1"],
+      "env": {
+        "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/",
+        "FUNPLAY_GODOT_MCP_TOKEN": "<token from Funplay MCP dock>"
+      }
     }
   }
 }
@@ -109,8 +120,13 @@ If you prefer to edit config files manually, use the examples below as fallback 
 {
   "servers": {
     "funplay": {
-      "type": "http",
-      "url": "http://127.0.0.1:8765/"
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "funplay-godot-mcp@0.9.1"],
+      "env": {
+        "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/",
+        "FUNPLAY_GODOT_MCP_TOKEN": "<token from Funplay MCP dock>"
+      }
     }
   }
 }
