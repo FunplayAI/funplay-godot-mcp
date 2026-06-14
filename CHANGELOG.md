@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2] - 2026-06-13
+
+### Fixed
+- Reduced hidden Dock overhead by skipping live UI refreshes while the Funplay MCP tab is not visible
+- Deferred expensive Tool Exposure population until the Dock is first shown, avoiding editor layout startup interference
+- Added dirty-checks before updating Dock labels and TextEdit contents to reduce repeated Godot UI relayout work
+
 ## [0.9.1] - 2026-06-12
 
 ### Fixed

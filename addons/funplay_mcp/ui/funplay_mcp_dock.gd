@@ -4,6 +4,8 @@ extends VBoxContainer
 const FunplayProjectSkillManager = preload("res://addons/funplay_mcp/core/funplay_project_skill_manager.gd")
 const FunplayUpdateChecker = preload("res://addons/funplay_mcp/core/funplay_update_checker.gd")
 
+const REFRESH_INTERVAL_MSEC = 1000
+
 var _server
 var _settings
 var _client_config_writer
@@ -36,6 +38,7 @@ var _skill_status_label: Label
 var _last_refresh_msec: int = 0
 var _last_tool_exposure_signature: String = ""
 var _updating_tool_checks: bool = false
+var _needs_refresh_when_visible: bool = true
 
 
 func setup(server, settings, client_config_writer, tool_registry = null) -> void:
@@ -48,14 +51,19 @@ func setup(server, settings, client_config_writer, tool_registry = null) -> void
 	_update_checker.setup(self)
 	if not _update_checker.state_changed.is_connected(_on_update_state_changed):
 		_update_checker.state_changed.connect(_on_update_state_changed)
-	refresh_live_state(true)
+	call_deferred("_refresh_when_visible")
 
 
 func refresh_live_state(force: bool = false) -> void:
+	if not _is_active_dock_tab():
+		_needs_refresh_when_visible = true
+		return
+
 	var now: int = Time.get_ticks_msec()
-	if not force and now - _last_refresh_msec < 300:
+	if not force and now - _last_refresh_msec < REFRESH_INTERVAL_MSEC:
 		return
 	_last_refresh_msec = now
+	_needs_refresh_when_visible = false
 
 	if _status_label == null:
 		return
@@ -63,21 +71,24 @@ func refresh_live_state(force: bool = false) -> void:
 	var status_text: String = "Stopped"
 	if _server.is_running():
 		status_text = "Attached" if _server.has_method("is_attached_to_existing") and _server.is_attached_to_existing() else "Running"
-	_status_label.text = "Status: %s" % status_text
-	_endpoint_label.text = "Endpoint: %s" % (_server.get_endpoint() if _server.is_running() else "http://127.0.0.1:%d/" % _settings.server_port)
-	_enable_checkbox.set_pressed_no_signal(_settings.server_enabled)
-	_port_spinbox.set_value_no_signal(_settings.server_port)
-	_debug_checkbox.set_pressed_no_signal(_settings.debug_logging_enabled)
-	_execute_safety_checkbox.set_pressed_no_signal(_settings.execute_code_safety_checks_enabled)
+	_set_label_text(_status_label, "Status: %s" % status_text)
+	_set_label_text(_endpoint_label, "Endpoint: %s" % (_server.get_endpoint() if _server.is_running() else "http://127.0.0.1:%d/" % _settings.server_port))
+	_set_checkbox_pressed(_enable_checkbox, _settings.server_enabled)
+	if int(_port_spinbox.value) != _settings.server_port:
+		_port_spinbox.set_value_no_signal(_settings.server_port)
+	_set_checkbox_pressed(_debug_checkbox, _settings.debug_logging_enabled)
+	_set_checkbox_pressed(_execute_safety_checkbox, _settings.execute_code_safety_checks_enabled)
 
 	if _settings.tool_profile == "core":
-		_profile_button.select(0)
+		if _profile_button.selected != 0:
+			_profile_button.select(0)
 	else:
-		_profile_button.select(1)
+		if _profile_button.selected != 1:
+			_profile_button.select(1)
 
 	_refresh_tool_exposure(force)
-	_snippet_text.text = _build_client_snippet(_client_button.get_item_text(_client_button.selected))
-	_log_text.text = _build_log_text()
+	_set_text_edit_text(_snippet_text, _build_client_snippet(_client_button.get_item_text(_client_button.selected)))
+	_set_text_edit_text(_log_text, _build_log_text())
 	_refresh_config_status()
 	_refresh_skill_status()
 	_refresh_update_state()
@@ -420,13 +431,13 @@ func _refresh_config_status() -> void:
 
 	var target: Dictionary = _get_selected_target()
 	if target.is_empty():
-		_config_status_label.text = "Config status: unavailable"
-		_config_path_label.text = ""
+		_set_label_text(_config_status_label, "Config status: unavailable")
+		_set_label_text(_config_path_label, "")
 		return
 
 	var exists: bool = _client_config_writer.target_exists(target)
-	_config_status_label.text = "Config status: Configured" if exists else "Config status: Not configured"
-	_config_path_label.text = str(target.get("path", ""))
+	_set_label_text(_config_status_label, "Config status: Configured" if exists else "Config status: Not configured")
+	_set_label_text(_config_path_label, str(target.get("path", "")))
 
 
 func _refresh_skill_status() -> void:
@@ -435,9 +446,9 @@ func _refresh_skill_status() -> void:
 
 	var status: Dictionary = _skill_manager.get_status()
 	if bool(status.get("skill_exists", false)):
-		_skill_status_label.text = "Project skills: Generated at %s" % str(status.get("skill_path", ""))
+		_set_label_text(_skill_status_label, "Project skills: Generated at %s" % str(status.get("skill_path", "")))
 	else:
-		_skill_status_label.text = "Project skills: Not generated"
+		_set_label_text(_skill_status_label, "Project skills: Not generated")
 
 
 func _refresh_update_state() -> void:
@@ -445,8 +456,8 @@ func _refresh_update_state() -> void:
 		return
 
 	var state: Dictionary = _update_checker.get_state()
-	_version_label.text = "v%s" % str(state.get("current_version", "0.0.0"))
-	_update_status_label.text = str(state.get("status_message", "Updates: Not checked"))
+	_set_label_text(_version_label, "v%s" % str(state.get("current_version", "0.0.0")))
+	_set_label_text(_update_status_label, str(state.get("status_message", "Updates: Not checked")))
 	_check_updates_button.disabled = bool(state.get("is_checking", false))
 	_check_updates_button.text = "Checking..." if bool(state.get("is_checking", false)) else "Check Updates"
 	_open_release_button.disabled = bool(state.get("is_checking", false))
@@ -503,16 +514,54 @@ func _refresh_tool_exposure(force: bool) -> void:
 func _update_tool_exposure_label(summary: Dictionary) -> void:
 	if _tool_exposure_label == null:
 		return
-	_tool_exposure_label.text = "Tool Exposure: %d/%d exposed" % [
+	_set_label_text(_tool_exposure_label, "Tool Exposure: %d/%d exposed" % [
 		int(summary.get("exposed", 0)),
 		int(summary.get("total_in_profile", 0)),
-	]
+	])
 
 
 func _get_endpoint() -> String:
 	return _server.get_endpoint() if _server.is_running() else "http://127.0.0.1:%d/" % _settings.server_port
 
 
+func _refresh_when_visible() -> void:
+	if _needs_refresh_when_visible or _is_active_dock_tab():
+		refresh_live_state(true)
+
+
+func _is_active_dock_tab() -> bool:
+	if not is_inside_tree():
+		return false
+
+	var current: Node = self
+	var parent: Node = get_parent()
+	while parent != null:
+		if parent is TabContainer:
+			var tab_container: TabContainer = parent
+			var current_tab: int = tab_container.current_tab
+			return current_tab >= 0 and current_tab < tab_container.get_child_count() and tab_container.get_child(current_tab) == current
+		current = parent
+		parent = parent.get_parent()
+	return is_visible_in_tree()
+
+
+func _set_label_text(label: Label, value: String) -> void:
+	if label != null and label.text != value:
+		label.text = value
+
+
+func _set_text_edit_text(text_edit: TextEdit, value: String) -> void:
+	if text_edit != null and text_edit.text != value:
+		text_edit.text = value
+
+
+func _set_checkbox_pressed(checkbox: CheckBox, pressed: bool) -> void:
+	if checkbox != null and checkbox.button_pressed != pressed:
+		checkbox.set_pressed_no_signal(pressed)
+
+
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE and _update_checker != null:
+	if what == NOTIFICATION_VISIBILITY_CHANGED and _is_active_dock_tab():
+		refresh_live_state(true)
+	elif what == NOTIFICATION_PREDELETE and _update_checker != null:
 		_update_checker.teardown()

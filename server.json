@@ -7,12 +7,12 @@
     "url": "https://github.com/FunplayAI/funplay-godot-mcp",
     "source": "github"
   },
-  "version": "0.9.1",
+  "version": "0.9.2",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "funplay-godot-mcp",
-      "version": "0.9.1",
+      "version": "0.9.2",
       "transport": {
         "type": "stdio"
       },
