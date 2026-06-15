@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- Keep Godot Asset Store zip packages limited to `addons/funplay_mcp/` plus the required root `LICENSE`, avoiding extra repository Markdown files in end-user project roots.
+
 ## [0.9.2] - 2026-06-13
 
 ### Fixed

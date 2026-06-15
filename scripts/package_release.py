@@ -28,13 +28,7 @@ REPOSITORY_URL = f"https://github.com/{REPOSITORY}"
 PACKAGE_PREFIX = "Funplay.GodotMcp"
 ADDON_ROOT = "addons/funplay_mcp"
 ALLOWED_ROOT_FILES = {
-    "README.md",
-    "README_CN.md",
     "LICENSE",
-    "CHANGELOG.md",
-    "CONTRIBUTING.md",
-    "ASSET_LIBRARY.md",
-    "server.json",
 }
 FORBIDDEN_NAMES = {
     ".DS_Store",
