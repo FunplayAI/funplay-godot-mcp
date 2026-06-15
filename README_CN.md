@@ -13,9 +13,6 @@
     <a href="https://store.godotengine.org/asset/funplay/funplay-godot-mcp">Godot Asset Store</a> ·
     中文 | <a href="./README.md">English</a>
   </p>
-  <p align="center">
-    <img src="./icon.svg" alt="Funplay MCP for Godot" width="128">
-  </p>
 </p>
 
 > 💖 如果这个项目对你有帮助，欢迎顺手点一个 Star。它能帮助更多 Godot 开发者发现这个项目，也能支持后续持续维护。
