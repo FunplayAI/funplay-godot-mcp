@@ -44,7 +44,7 @@ Recommended submission metadata:
 - License: `MIT`
 - Godot version: `4.2+`
 - Download URL: the GitHub Release zip for the target version
-- Store thumbnail: use the generated store media assets, not a bundled addon icon file
+- Icon: `addons/funplay_mcp/icon.svg`
 - Support level: community/open-source GitHub issues
 
 Submission notes should emphasize that the addon is Godot-native, ships as a normal editor plugin, and does not require a sidecar daemon for core workflows.
