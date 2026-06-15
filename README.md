@@ -10,6 +10,7 @@
     <a href="#"><img src="https://img.shields.io/badge/Platform-Editor%20Only-orange" alt="Editor Only"></a>
   </p>
   <p align="center">
+    <a href="https://store.godotengine.org/asset/funplay/funplay-godot-mcp">Godot Asset Store</a> ·
     <a href="./README_CN.md">中文</a> | English
   </p>
   <p align="center">
@@ -43,6 +44,7 @@ If you just want to get connected fast, do these three things:
 
 You can either:
 
+- install it from the [Godot Asset Store](https://store.godotengine.org/asset/funplay/funplay-godot-mcp),
 - download `Funplay.GodotMcp.vX.Y.Z.zip` from the latest GitHub Release and extract it into your project root,
 - clone this repository and open it directly as a Godot project, or
 - copy `addons/funplay_mcp` into your own Godot `res://addons/` directory
