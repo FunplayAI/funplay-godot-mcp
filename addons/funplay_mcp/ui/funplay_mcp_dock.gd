@@ -101,11 +101,20 @@ func _build_ui() -> void:
 
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
-	add_theme_constant_override("separation", 8)
+
+	var content_scroll = ScrollContainer.new()
+	content_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	add_child(content_scroll)
+
+	var content = VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 8)
+	content_scroll.add_child(content)
 
 	var title_row = HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 8)
-	add_child(title_row)
+	content.add_child(title_row)
 
 	_title_label = Label.new()
 	_title_label.text = "Funplay MCP"
@@ -119,7 +128,7 @@ func _build_ui() -> void:
 
 	var update_row = HBoxContainer.new()
 	update_row.add_theme_constant_override("separation", 6)
-	add_child(update_row)
+	content.add_child(update_row)
 
 	_update_status_label = Label.new()
 	_update_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -137,53 +146,53 @@ func _build_ui() -> void:
 	update_row.add_child(_open_release_button)
 
 	_status_label = Label.new()
-	add_child(_status_label)
+	content.add_child(_status_label)
 
 	_endpoint_label = Label.new()
 	_endpoint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	add_child(_endpoint_label)
+	content.add_child(_endpoint_label)
 
 	_enable_checkbox = CheckBox.new()
 	_enable_checkbox.text = "Enable MCP Server"
 	_enable_checkbox.toggled.connect(_on_enable_toggled)
-	add_child(_enable_checkbox)
+	content.add_child(_enable_checkbox)
 
 	var port_label = Label.new()
 	port_label.text = "Port"
-	add_child(port_label)
+	content.add_child(port_label)
 
 	_port_spinbox = SpinBox.new()
 	_port_spinbox.min_value = 1
 	_port_spinbox.max_value = 65535
 	_port_spinbox.step = 1
 	_port_spinbox.value_changed.connect(_on_port_changed)
-	add_child(_port_spinbox)
+	content.add_child(_port_spinbox)
 
 	var profile_label = Label.new()
 	profile_label.text = "Tool Profile"
-	add_child(profile_label)
+	content.add_child(profile_label)
 
 	_profile_button = OptionButton.new()
 	_profile_button.add_item("core")
 	_profile_button.add_item("full")
 	_profile_button.item_selected.connect(_on_profile_selected)
-	add_child(_profile_button)
+	content.add_child(_profile_button)
 
 	_debug_checkbox = CheckBox.new()
 	_debug_checkbox.text = "Debug Logging"
 	_debug_checkbox.tooltip_text = "Print MCP activity to the Godot output panel."
 	_debug_checkbox.toggled.connect(_on_debug_logging_toggled)
-	add_child(_debug_checkbox)
+	content.add_child(_debug_checkbox)
 
 	_execute_safety_checkbox = CheckBox.new()
 	_execute_safety_checkbox.text = "execute_code Safety Checks"
 	_execute_safety_checkbox.tooltip_text = "Block common dangerous filesystem, process, and project-setting snippets by default. Tool calls can still override with safety_checks=false."
 	_execute_safety_checkbox.toggled.connect(_on_execute_safety_toggled)
-	add_child(_execute_safety_checkbox)
+	content.add_child(_execute_safety_checkbox)
 
 	var map_row = HBoxContainer.new()
 	map_row.add_theme_constant_override("separation", 6)
-	add_child(map_row)
+	content.add_child(map_row)
 
 	var open_map_button = Button.new()
 	open_map_button.text = "Open Project Map"
@@ -198,7 +207,7 @@ func _build_ui() -> void:
 
 	var exposure_header = HBoxContainer.new()
 	exposure_header.add_theme_constant_override("separation", 6)
-	add_child(exposure_header)
+	content.add_child(exposure_header)
 
 	_tool_exposure_label = Label.new()
 	_tool_exposure_label.text = "Tool Exposure"
@@ -214,7 +223,7 @@ func _build_ui() -> void:
 	var tool_scroll = ScrollContainer.new()
 	tool_scroll.custom_minimum_size = Vector2(0, 160)
 	tool_scroll.size_flags_vertical = Control.SIZE_FILL
-	add_child(tool_scroll)
+	content.add_child(tool_scroll)
 
 	_tool_list = VBoxContainer.new()
 	_tool_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -223,18 +232,18 @@ func _build_ui() -> void:
 
 	var client_label = Label.new()
 	client_label.text = "Client Config Snippet"
-	add_child(client_label)
+	content.add_child(client_label)
 
 	_client_button = OptionButton.new()
 	for client_name in ["Codex", "Claude Code", "Cursor", "VS Code"]:
 		_client_button.add_item(client_name)
 	_client_button.select(0)
 	_client_button.item_selected.connect(_on_client_selected)
-	add_child(_client_button)
+	content.add_child(_client_button)
 
 	var action_row = HBoxContainer.new()
 	action_row.add_theme_constant_override("separation", 6)
-	add_child(action_row)
+	content.add_child(action_row)
 
 	var copy_button = Button.new()
 	copy_button.text = "Copy Snippet"
@@ -253,34 +262,34 @@ func _build_ui() -> void:
 	action_row.add_child(configure_skills_button)
 
 	_copy_status_label = Label.new()
-	add_child(_copy_status_label)
+	content.add_child(_copy_status_label)
 
 	_config_status_label = Label.new()
-	add_child(_config_status_label)
+	content.add_child(_config_status_label)
 
 	_config_path_label = Label.new()
 	_config_path_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	add_child(_config_path_label)
+	content.add_child(_config_path_label)
 
 	_skill_status_label = Label.new()
 	_skill_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	add_child(_skill_status_label)
+	content.add_child(_skill_status_label)
 
 	_snippet_text = TextEdit.new()
 	_snippet_text.custom_minimum_size = Vector2(0, 130)
 	_snippet_text.editable = false
 	_snippet_text.size_flags_vertical = Control.SIZE_FILL
-	add_child(_snippet_text)
+	content.add_child(_snippet_text)
 
 	var log_label = Label.new()
 	log_label.text = "Recent Activity"
-	add_child(log_label)
+	content.add_child(log_label)
 
 	_log_text = TextEdit.new()
 	_log_text.custom_minimum_size = Vector2(0, 180)
 	_log_text.editable = false
 	_log_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	add_child(_log_text)
+	content.add_child(_log_text)
 
 
 func _on_enable_toggled(pressed: bool) -> void:

@@ -135,22 +135,24 @@ func add_interaction(name: String, status: String, message: String) -> void:
 func _handle_http_request(method: String, path: String, body_text: String, headers: Dictionary = {}) -> Dictionary:
 	if method == "GET":
 		if path == "/" or path == "/health":
+			var health: Dictionary = {
+				"name": SERVER_NAME,
+				"version": SERVER_VERSION,
+				"endpoint": get_endpoint(),
+				"tool_profile": _settings.tool_profile,
+				"debug_logging_enabled": _settings.debug_logging_enabled,
+				"execute_code_safety_checks_enabled": _settings.execute_code_safety_checks_enabled,
+				"auth_required": str(_settings.server_auth_token).strip_edges() != "",
+				"protocol_version": _request_handler.get_default_protocol_version(),
+				"attached_to_existing": _attached_to_existing,
+			}
+			if _is_request_authenticated(headers):
+				health["project_name"] = str(ProjectSettings.get_setting("application/config/name", ""))
+				health["project_identity"] = _project_identity_hash()
 			return {
 				"status": 200,
 				"content_type": "application/json",
-				"body": JSON.stringify({
-					"name": SERVER_NAME,
-					"version": SERVER_VERSION,
-					"endpoint": get_endpoint(),
-					"tool_profile": _settings.tool_profile,
-					"debug_logging_enabled": _settings.debug_logging_enabled,
-					"execute_code_safety_checks_enabled": _settings.execute_code_safety_checks_enabled,
-					"auth_required": str(_settings.server_auth_token).strip_edges() != "",
-					"protocol_version": _request_handler.get_default_protocol_version(),
-					"project_name": str(ProjectSettings.get_setting("application/config/name", "")),
-					"project_identity": _project_identity_hash(),
-					"attached_to_existing": _attached_to_existing,
-				}),
+				"body": JSON.stringify(health),
 			}
 		return {
 			"status": 404,
@@ -257,17 +259,25 @@ func _probe_existing_server(port: int) -> Dictionary:
 		peer.disconnect_from_host()
 		return {}
 
-	var request_text: String = "GET /health HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nConnection: close\r\n\r\n" % port
+	var request_lines: Array[String] = [
+		"GET /health HTTP/1.1",
+		"Host: 127.0.0.1:%d" % port,
+		"Connection: close",
+	]
+	var auth_token: String = str(_settings.server_auth_token).strip_edges()
+	if auth_token != "":
+		request_lines.append("X-Funplay-MCP-Token: %s" % auth_token)
+	var request_text: String = "\r\n".join(request_lines) + "\r\n\r\n"
 	peer.put_data(request_text.to_utf8_buffer())
 	var response_text: String = ""
 	deadline = Time.get_ticks_msec() + 500
 	while Time.get_ticks_msec() < deadline:
 		peer.poll()
+		if peer.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+			break
 		var available: int = peer.get_available_bytes()
 		if available > 0:
 			response_text += peer.get_utf8_string(available)
-		if peer.get_status() != StreamPeerTCP.STATUS_CONNECTED and available == 0:
-			break
 		OS.delay_msec(10)
 	peer.disconnect_from_host()
 
@@ -275,6 +285,8 @@ func _probe_existing_server(port: int) -> Dictionary:
 	if body_start == -1:
 		return {}
 	var body_text: String = response_text.substr(body_start + 4).strip_edges()
+	if not body_text.begins_with("{"):
+		return {}
 	var parsed = JSON.parse_string(body_text)
 	if parsed is Dictionary:
 		return parsed
@@ -291,6 +303,10 @@ func _project_identity_hash() -> String:
 
 
 func _validate_post_request_security(headers: Dictionary) -> Dictionary:
+	var host: String = str(headers.get("host", "")).strip_edges()
+	if host != "" and not _is_allowed_local_request_origin(host):
+		return _json_error_response(403, -32001, "Forbidden request host.")
+
 	var origin: String = str(headers.get("origin", "")).strip_edges()
 	if origin != "" and not _is_allowed_local_request_origin(origin):
 		return _json_error_response(403, -32001, "Forbidden request origin.")
@@ -303,11 +319,18 @@ func _validate_post_request_security(headers: Dictionary) -> Dictionary:
 	if expected_token == "":
 		return {}
 
-	var provided_token: String = _extract_request_auth_token(headers)
-	if provided_token == "" or provided_token != expected_token:
+	if not _is_request_authenticated(headers):
 		return _json_error_response(401, -32001, "Missing or invalid Funplay MCP auth token.")
 
 	return {}
+
+
+func _is_request_authenticated(headers: Dictionary) -> bool:
+	var expected_token: String = str(_settings.server_auth_token).strip_edges()
+	if expected_token == "":
+		return false
+	var provided_token: String = _extract_request_auth_token(headers)
+	return provided_token != "" and provided_token == expected_token
 
 
 func _extract_request_auth_token(headers: Dictionary) -> String:

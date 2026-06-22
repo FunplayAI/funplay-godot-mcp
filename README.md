@@ -59,6 +59,7 @@ In Godot:
 The server starts on `http://127.0.0.1:8765/` by default.
 If that port is already occupied, it automatically picks another free local port and saves it to `user://funplay_mcp_settings.cfg`.
 Local MCP POST requests require the per-project auth token stored in `user://funplay_mcp_settings.cfg`; the dock writes it into generated stdio client configs automatically.
+Authenticated clients can run high-impact editor tools, including `execute_code`; keep the server enabled only while working with trusted local clients and leave safety checks on unless you intentionally need to override them.
 The dock also shows the installed addon version and includes a **Check Updates** action that opens the latest GitHub Release when a newer version is available.
 
 ### 3. Configure Your AI Client

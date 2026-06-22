@@ -4,6 +4,8 @@
 
 ### Changed
 - Keep Godot Asset Store zip packages limited to `addons/funplay_mcp/` plus the required root `LICENSE`, avoiding extra repository Markdown files in end-user project roots.
+- Wrap the editor Dock contents in an internal scroll container so Godot 4.7 keeps the bottom Output/Debugger/Animation panel visible when the plugin is enabled.
+- Reduce unauthenticated `/health` project fingerprinting and reject non-local POST `Host` headers as defense-in-depth.
 
 ## [0.9.2] - 2026-06-13
 
