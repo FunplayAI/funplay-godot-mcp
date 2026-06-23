@@ -41,6 +41,11 @@ const SIZE_FLAG_MAP = {
 const RUNTIME_BRIDGE_AUTOLOAD_NAME = "FunplayMcpRuntimeBridge"
 const RUNTIME_BRIDGE_SCRIPT_PATH = "res://addons/funplay_mcp/runtime/funplay_mcp_runtime_bridge.gd"
 const RUNTIME_BRIDGE_STATE_PATH = "user://funplay_mcp_runtime_bridge.json"
+const LANGUAGE_MODE_CACHE_TTL_MSEC = 5000
+
+var _language_mode_cache: String = ""
+var _language_mode_cache_root: String = ""
+var _language_mode_cache_msec: int = 0
 
 class ExecutionContext:
 	extends RefCounted
@@ -2744,24 +2749,23 @@ func wait_msec(arguments: Dictionary) -> String:
 
 func detect_script_language_mode() -> String:
 	var project_root = ProjectSettings.globalize_path("res://")
-	var csproj_files: Array = []
-	var sln_files: Array = []
-	var csharp_scripts: Array = []
-	var gd_scripts: Array = []
-	_collect_matching_files(project_root, false, 200, csproj_files, [".csproj"])
-	_collect_matching_files(project_root, false, 200, sln_files, [".sln"])
-	_collect_matching_files("res://", true, 5000, csharp_scripts, [".cs"])
-	_collect_matching_files("res://", true, 5000, gd_scripts, [".gd"])
-	csharp_scripts = _exclude_internal_plugin_paths(csharp_scripts)
-	gd_scripts = _exclude_internal_plugin_paths(gd_scripts)
+	var now: int = Time.get_ticks_msec()
+	if _language_mode_cache != "" and _language_mode_cache_root == project_root and now - _language_mode_cache_msec < LANGUAGE_MODE_CACHE_TTL_MSEC:
+		return _language_mode_cache
 
-	var has_dotnet = csproj_files.size() > 0 or sln_files.size() > 0 or csharp_scripts.size() > 0
-	var has_gdscript = gd_scripts.size() > 0
+	var has_project_dotnet_files: bool = _has_matching_file(project_root, false, [".csproj", ".sln"], false)
+	var has_dotnet: bool = has_project_dotnet_files or _has_matching_file("res://", true, [".cs"], true)
+	var has_gdscript: bool = _has_matching_file("res://", true, [".gd"], true)
+	var detected_mode: String = "gdscript"
 	if has_dotnet and has_gdscript:
-		return "mixed"
-	if has_dotnet:
-		return "dotnet"
-	return "gdscript"
+		detected_mode = "mixed"
+	elif has_dotnet:
+		detected_mode = "dotnet"
+
+	_language_mode_cache = detected_mode
+	_language_mode_cache_root = project_root
+	_language_mode_cache_msec = now
+	return detected_mode
 
 
 func validate_gdscript_file(arguments: Dictionary) -> String:
@@ -4880,11 +4884,54 @@ func _matches_extension(path: String, extensions: Array) -> bool:
 	return false
 
 
+func _has_matching_file(path: String, recursive: bool, extensions: Array, skip_internal_plugin_paths: bool) -> bool:
+	var dir = DirAccess.open(path)
+	if dir == null:
+		return false
+
+	dir.list_dir_begin()
+	var item = dir.get_next()
+	while item != "":
+		var child_path: String = path.path_join(item)
+		if dir.current_is_dir():
+			if recursive and _should_scan_for_language_mode(child_path, skip_internal_plugin_paths):
+				if _has_matching_file(child_path, recursive, extensions, skip_internal_plugin_paths):
+					dir.list_dir_end()
+					return true
+		elif _matches_extension(child_path, extensions):
+			if not skip_internal_plugin_paths or not _is_internal_plugin_path(child_path):
+				dir.list_dir_end()
+				return true
+		item = dir.get_next()
+
+	dir.list_dir_end()
+	return false
+
+
+func _should_scan_for_language_mode(path: String, skip_internal_plugin_paths: bool) -> bool:
+	var normalized: String = path.replace("\\", "/")
+	var dir_name: String = normalized.get_file()
+	if dir_name.begins_with(".") or dir_name in ["tmp", "temp", "Temp", "Library"]:
+		return false
+	if skip_internal_plugin_paths and _is_internal_plugin_path(normalized):
+		return false
+	return true
+
+
+func _is_internal_plugin_path(path: String) -> bool:
+	var text: String = str(path).replace("\\", "/")
+	return (
+		text == "res://addons/funplay_mcp"
+		or text.begins_with("res://addons/funplay_mcp/")
+		or text.ends_with("/addons/funplay_mcp")
+		or text.contains("/addons/funplay_mcp/")
+	)
+
+
 func _exclude_internal_plugin_paths(paths: Array) -> Array:
 	var filtered: Array = []
 	for path in paths:
-		var text = str(path).replace("\\", "/")
-		if text.contains("/addons/funplay_mcp/") or text.begins_with("res://addons/funplay_mcp/"):
+		if _is_internal_plugin_path(path):
 			continue
 		filtered.append(path)
 	return filtered

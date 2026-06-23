@@ -1,7 +1,7 @@
 @tool
 extends RefCounted
 
-const WRAPPER_PACKAGE = "funplay-godot-mcp@0.9.3"
+const WRAPPER_PACKAGE = "funplay-godot-mcp@0.9.4"
 
 
 func list_targets(endpoint: String, auth_token: String = "") -> Array:

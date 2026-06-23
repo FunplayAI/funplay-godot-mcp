@@ -67,9 +67,9 @@ func get_tool_names(profile: String) -> Array:
 	return names
 
 
-func get_tool_exposure(profile: String) -> Array:
+func get_tool_exposure(profile: String, detected_language_mode: String = "") -> Array:
 	var selected_profile: String = profile if profile in _profiles else "core"
-	var language_mode: String = _core_tools.detect_script_language_mode()
+	var language_mode: String = detected_language_mode if detected_language_mode != "" else _core_tools.detect_script_language_mode()
 	var tools: Array = []
 	for tool_name in _profiles[selected_profile]:
 		if not _tools.has(tool_name):
@@ -93,7 +93,8 @@ func get_tool_exposure(profile: String) -> Array:
 
 
 func get_exposure_summary(profile: String) -> Dictionary:
-	var tools: Array = get_tool_exposure(profile)
+	var language_mode: String = _core_tools.detect_script_language_mode()
+	var tools: Array = get_tool_exposure(profile, language_mode)
 	var exposed_count: int = 0
 	var disabled_count: int = 0
 	var language_hidden_count: int = 0
@@ -106,7 +107,7 @@ func get_exposure_summary(profile: String) -> Dictionary:
 			language_hidden_count += 1
 	return {
 		"profile": profile if profile in _profiles else "core",
-		"language_mode": _core_tools.detect_script_language_mode(),
+		"language_mode": language_mode,
 		"total_in_profile": tools.size(),
 		"exposed": exposed_count,
 		"disabled": disabled_count,

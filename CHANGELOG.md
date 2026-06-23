@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-06-23
+
+### Fixed
+- Reduced Godot 4.7 .NET editor Dock refresh overhead by caching project language detection and using early-exit script scans instead of repeatedly collecting thousands of files.
+- Reused the detected language mode while building tool exposure summaries, preventing duplicate project scans when the Funplay MCP Dock becomes visible.
+
 ## [0.9.3] - 2026-06-22
 
 ### Changed

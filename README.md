@@ -81,7 +81,7 @@ If you prefer to edit config files manually, use the examples below as fallback 
     "funplay": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "funplay-godot-mcp@0.9.3"],
+      "args": ["-y", "funplay-godot-mcp@0.9.4"],
       "env": {
         "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/",
         "FUNPLAY_GODOT_MCP_TOKEN": "<token from Funplay MCP dock>"
@@ -101,7 +101,7 @@ If you prefer to edit config files manually, use the examples below as fallback 
   "mcpServers": {
     "funplay": {
       "command": "npx",
-      "args": ["-y", "funplay-godot-mcp@0.9.3"],
+      "args": ["-y", "funplay-godot-mcp@0.9.4"],
       "env": {
         "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/",
         "FUNPLAY_GODOT_MCP_TOKEN": "<token from Funplay MCP dock>"
@@ -122,7 +122,7 @@ If you prefer to edit config files manually, use the examples below as fallback 
     "funplay": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "funplay-godot-mcp@0.9.3"],
+      "args": ["-y", "funplay-godot-mcp@0.9.4"],
       "env": {
         "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/",
         "FUNPLAY_GODOT_MCP_TOKEN": "<token from Funplay MCP dock>"
