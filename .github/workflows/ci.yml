@@ -23,10 +23,20 @@ jobs:
       - name: Validate repository
         run: python scripts/validate_repo.py
 
+  stdio-wrapper:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ["18", "24"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: ${{ matrix.node-version }}
 
       - name: Run stdio wrapper tests
         run: npm test --prefix stdio-wrapper
