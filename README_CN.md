@@ -149,6 +149,8 @@ url = "http://127.0.0.1:8765/"
 
 大多数客户端可以直接通过 HTTP 连接 Godot 插件。如果你使用的客户端或发布渠道更偏好 stdio 包，本仓库也提供了 `stdio-wrapper/` 下的 npm wrapper。
 
+Wrapper 将每个 HTTP 请求（包括响应正文）的等待时间限制为 60 秒，避免停滞的请求无限阻塞后续消息。
+
 ```bash
 cd stdio-wrapper
 npm link

@@ -23,6 +23,14 @@ jobs:
       - name: Validate repository
         run: python scripts/validate_repo.py
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Run stdio wrapper tests
+        run: npm test --prefix stdio-wrapper
+
   godot-play-mode:
     runs-on: ubuntu-latest
 

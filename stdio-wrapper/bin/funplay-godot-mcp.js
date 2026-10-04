@@ -4,6 +4,7 @@ import { argv, env, exit, stderr, stdin, stdout } from "node:process";
 
 const VERSION = "0.10.0";
 const DEFAULT_URL = "http://127.0.0.1:8765/";
+const REQUEST_TIMEOUT_MSEC = 60_000;
 
 const options = parseArgs(argv.slice(2));
 if (options.help) {
@@ -119,6 +120,7 @@ async function forwardMessage(message) {
       method: "POST",
       headers,
       body: JSON.stringify(message),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MSEC),
     });
 
     if (response.status === 204) {
