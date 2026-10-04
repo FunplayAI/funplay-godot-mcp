@@ -147,7 +147,7 @@ url = "http://127.0.0.1:8765/"
 
 ### Optional stdio wrapper
 
-Most clients can connect directly to the addon over HTTP. For clients or registries that prefer stdio packages, this repository also includes an npm-ready wrapper under `stdio-wrapper/`.
+Most clients can connect directly to the addon over HTTP. Integral JSON-RPC response IDs are serialized as integers, preserving compatibility with clients that distinguish integers from floating-point numbers. For clients or registries that prefer stdio packages, this repository also includes an npm-ready wrapper under `stdio-wrapper/`.
 
 ```bash
 cd stdio-wrapper

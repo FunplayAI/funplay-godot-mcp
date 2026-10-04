@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Serialize integral JSON-RPC response IDs as integers so direct HTTP MCP clients can complete initialization and match responses; preserve string and fractional IDs.
+
 ## [0.10.0] - 2026-07-30
 
 ### Added

@@ -147,7 +147,7 @@ url = "http://127.0.0.1:8765/"
 
 ### 可选 stdio wrapper
 
-大多数客户端可以直接通过 HTTP 连接 Godot 插件。如果你使用的客户端或发布渠道更偏好 stdio 包，本仓库也提供了 `stdio-wrapper/` 下的 npm wrapper。
+大多数客户端可以直接通过 HTTP 连接 Godot 插件。整数值的 JSON-RPC 响应 ID 会序列化为整数，以兼容区分整数和浮点数的客户端。如果你使用的客户端或发布渠道更偏好 stdio 包，本仓库也提供了 `stdio-wrapper/` 下的 npm wrapper。
 
 ```bash
 cd stdio-wrapper
