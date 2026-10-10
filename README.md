@@ -82,7 +82,7 @@ If you prefer to edit config files manually, use the examples below as fallback 
     "funplay": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "funplay-godot-mcp@0.10.0"],
+      "args": ["-y", "funplay-godot-mcp@0.10.1"],
       "env": {
         "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/",
         "FUNPLAY_GODOT_MCP_TOKEN": "<token from Funplay MCP dock>"
@@ -102,7 +102,7 @@ If you prefer to edit config files manually, use the examples below as fallback 
   "mcpServers": {
     "funplay": {
       "command": "npx",
-      "args": ["-y", "funplay-godot-mcp@0.10.0"],
+      "args": ["-y", "funplay-godot-mcp@0.10.1"],
       "env": {
         "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/",
         "FUNPLAY_GODOT_MCP_TOKEN": "<token from Funplay MCP dock>"
@@ -123,7 +123,7 @@ If you prefer to edit config files manually, use the examples below as fallback 
     "funplay": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "funplay-godot-mcp@0.10.0"],
+      "args": ["-y", "funplay-godot-mcp@0.10.1"],
       "env": {
         "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/",
         "FUNPLAY_GODOT_MCP_TOKEN": "<token from Funplay MCP dock>"
@@ -157,7 +157,7 @@ npm link
 FUNPLAY_GODOT_MCP_URL=http://127.0.0.1:8765/ funplay-godot-mcp
 ```
 
-After the wrapper is published to npm, replace `npm link` with `npm install -g funplay-godot-mcp`.
+To install the published wrapper, use `npm install -g funplay-godot-mcp@0.10.1` instead of `npm link`.
 
 Example MCP client entry:
 

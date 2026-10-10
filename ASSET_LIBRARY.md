@@ -11,16 +11,12 @@ This project is designed to be publishable as a regular Godot addon.
 
 ## Package Contents
 
-The Godot addon package should include:
+The generated Godot addon zip includes:
 
 - `addons/funplay_mcp/**`
-- `README.md`
-- `README_CN.md`
 - `LICENSE`
-- `CHANGELOG.md`
-- `CONTRIBUTING.md`
-- `ASSET_LIBRARY.md`
-- `server.json`
+
+The GitHub Release provides `release-manifest.json`, `SHA256SUMS.txt`, `server.json`, and `release-notes.md` as separate attachments. The README, changelog, contribution guide, and this packaging guide are available in the repository.
 
 The package must not include project-local Godot metadata, editor caches, export presets, build outputs, or dependency folders.
 

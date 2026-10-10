@@ -2,7 +2,7 @@
 
 import { argv, env, exit, stderr, stdin, stdout } from "node:process";
 
-const VERSION = "0.10.0";
+const VERSION = "0.10.1";
 const DEFAULT_URL = "http://127.0.0.1:8765/";
 const REQUEST_TIMEOUT_MSEC = 60_000;
 

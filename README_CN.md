@@ -82,7 +82,7 @@ Dock 里也会显示当前插件版本，并提供 **Check Updates** 按钮；�
     "funplay": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "funplay-godot-mcp@0.10.0"],
+      "args": ["-y", "funplay-godot-mcp@0.10.1"],
       "env": {
         "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/",
         "FUNPLAY_GODOT_MCP_TOKEN": "<Funplay MCP Dock 中显示/写入的 token>"
@@ -102,7 +102,7 @@ Dock 里也会显示当前插件版本，并提供 **Check Updates** 按钮；�
   "mcpServers": {
     "funplay": {
       "command": "npx",
-      "args": ["-y", "funplay-godot-mcp@0.10.0"],
+      "args": ["-y", "funplay-godot-mcp@0.10.1"],
       "env": {
         "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/",
         "FUNPLAY_GODOT_MCP_TOKEN": "<Funplay MCP Dock 中显示/写入的 token>"
@@ -123,7 +123,7 @@ Dock 里也会显示当前插件版本，并提供 **Check Updates** 按钮；�
     "funplay": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "funplay-godot-mcp@0.10.0"],
+      "args": ["-y", "funplay-godot-mcp@0.10.1"],
       "env": {
         "FUNPLAY_GODOT_MCP_URL": "http://127.0.0.1:8765/",
         "FUNPLAY_GODOT_MCP_TOKEN": "<Funplay MCP Dock 中显示/写入的 token>"
@@ -157,7 +157,7 @@ npm link
 FUNPLAY_GODOT_MCP_URL=http://127.0.0.1:8765/ funplay-godot-mcp
 ```
 
-等 wrapper 发布到 npm 后，可以把 `npm link` 换成 `npm install -g funplay-godot-mcp`。
+安装已发布的 wrapper 时，可以把 `npm link` 换成 `npm install -g funplay-godot-mcp@0.10.1`。
 
 MCP 客户端配置示例：
 
