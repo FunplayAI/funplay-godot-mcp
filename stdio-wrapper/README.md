@@ -4,6 +4,8 @@
 
 This package bridges MCP stdio clients to the local HTTP server started by the Funplay MCP for Godot editor addon.
 
+Each HTTP request has a 60-second timeout covering both response headers and the body. A timeout returns a JSON-RPC error for a request and lets the next queued message proceed.
+
 ## Usage
 
 Start Godot, enable the addon, and make sure the Funplay MCP server is running. For local development, link the wrapper first:

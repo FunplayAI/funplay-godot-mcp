@@ -4,6 +4,9 @@
   "description": "stdio bridge for the local Funplay MCP for Godot editor addon.",
   "license": "MIT",
   "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
   "mcpName": "io.github.FunplayAI/funplay-godot-mcp",
   "bin": {
     "funplay-godot-mcp": "bin/funplay-godot-mcp.js"

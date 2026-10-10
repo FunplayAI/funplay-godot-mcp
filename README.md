@@ -149,6 +149,8 @@ url = "http://127.0.0.1:8765/"
 
 Most clients can connect directly to the addon over HTTP. For clients or registries that prefer stdio packages, this repository also includes an npm-ready wrapper under `stdio-wrapper/`.
 
+The wrapper limits each HTTP request, including its response body, to 60 seconds so a stalled request cannot block later messages indefinitely.
+
 ```bash
 cd stdio-wrapper
 npm link
