@@ -147,7 +147,9 @@ url = "http://127.0.0.1:8765/"
 
 ### Optional stdio wrapper
 
-Most clients can connect directly to the addon over HTTP. Integral JSON-RPC response IDs are serialized as integers, preserving compatibility with clients that distinguish integers from floating-point numbers. For clients or registries that prefer stdio packages, this repository also includes an npm-ready wrapper under `stdio-wrapper/`.
+Most clients can connect directly to the addon over HTTP. Integral JSON-RPC response IDs within Godot's signed 64-bit range are serialized as integers, preserving compatibility with clients that distinguish integers from floating-point numbers. IDs outside that range retain their existing representation. For clients or registries that prefer stdio packages, this repository also includes an npm-ready wrapper under `stdio-wrapper/`.
+
+The wrapper limits each HTTP request, including its response body, to 60 seconds so a stalled request cannot block later messages indefinitely.
 
 ```bash
 cd stdio-wrapper

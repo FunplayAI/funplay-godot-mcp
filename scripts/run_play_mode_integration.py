@@ -174,7 +174,19 @@ def run(godot: pathlib.Path, keep_temp: bool) -> int:
     try:
         wait_for_server(port, process)
 
-        for request_id in (0, -1, 2.5, "client-1"):
+        for request_id in (
+            0,
+            -1,
+            -(2**63),
+            2**53 - 1,
+            2**63 - 1024,
+            2.5,
+            float(2**63),
+            float(-(2**63) - 2048),
+            1e20,
+            -1e20,
+            "client-1",
+        ):
             initialized = rpc(port, request_id, "initialize", method="initialize")
             if initialized.get("result", {}).get("protocolVersion") != "2025-11-25":
                 raise AssertionError(f"Initialization did not negotiate the MCP protocol: {initialized}")

@@ -3,7 +3,8 @@
 ## [Unreleased]
 
 ### Fixed
-- Serialize integral JSON-RPC response IDs as integers so direct HTTP MCP clients can complete initialization and match responses; preserve string and fractional IDs.
+- Serialize integral JSON-RPC response IDs within Godot's signed 64-bit range as integers so direct HTTP MCP clients can complete initialization and match responses; preserve string, fractional, and out-of-range IDs.
+- Bound stdio wrapper HTTP requests and response-body reads to 60 seconds, returning a JSON-RPC error and releasing the serial queue when Godot stalls.
 
 ## [0.10.0] - 2026-07-30
 
