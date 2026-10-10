@@ -209,6 +209,12 @@ func _handle_http_request(method: String, path: String, body_text: String, heade
 			"body": "",
 		}
 
+	var response_id = response.get("id")
+	if response_id is float and response_id == floor(response_id):
+		# int() clamps out-of-range values; keep those IDs unchanged.
+		if response_id >= -9223372036854775808.0 and response_id < 9223372036854775808.0:
+			response["id"] = int(response_id)
+
 	return {
 		"status": 200,
 		"content_type": "application/json",

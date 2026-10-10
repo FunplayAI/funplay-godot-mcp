@@ -64,12 +64,12 @@ def write_editor_configuration(project: pathlib.Path, home: pathlib.Path, port: 
     )
 
 
-def rpc(port: int, request_id: int, tool_name: str, arguments: dict | None = None) -> dict:
+def rpc(port: int, request_id: int | float | str, tool_name: str, arguments: dict | None = None, *, method: str = "tools/call") -> dict:
     payload = {
         "jsonrpc": "2.0",
         "id": request_id,
-        "method": "tools/call",
-        "params": {"name": tool_name, "arguments": arguments or {}},
+        "method": method,
+        "params": {"name": tool_name, "arguments": arguments or {}} if method == "tools/call" else {},
     }
     request = urllib.request.Request(
         f"http://127.0.0.1:{port}/",
@@ -86,7 +86,7 @@ def rpc(port: int, request_id: int, tool_name: str, arguments: dict | None = Non
     if not body:
         raise AssertionError(f"{tool_name} returned an empty HTTP body")
     parsed = json.loads(body)
-    if parsed.get("id") != request_id:
+    if parsed.get("id") != request_id or type(parsed.get("id")) is not type(request_id):
         raise AssertionError(f"{tool_name} returned the wrong request id: {parsed}")
     return parsed
 
@@ -173,6 +173,26 @@ def run(godot: pathlib.Path, keep_temp: bool) -> int:
     failure: Exception | None = None
     try:
         wait_for_server(port, process)
+
+        for request_id in (
+            0,
+            -1,
+            -(2**63),
+            2**53 - 1,
+            2**63 - 1024,
+            2.5,
+            float(2**63),
+            float(-(2**63) - 2048),
+            1e20,
+            -1e20,
+            "client-1",
+        ):
+            initialized = rpc(port, request_id, "initialize", method="initialize")
+            if initialized.get("result", {}).get("protocolVersion") != "2025-11-25":
+                raise AssertionError(f"Initialization did not negotiate the MCP protocol: {initialized}")
+            unknown = rpc(port, request_id, "missing_tool")
+            if unknown.get("error", {}).get("code") != -32602:
+                raise AssertionError(f"Unknown tool did not return a JSON-RPC error: {unknown}")
 
         refused = rpc(port, 1, "play_main_scene")
         refused_result = structured(refused)
